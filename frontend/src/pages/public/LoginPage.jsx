@@ -27,7 +27,7 @@ export const LoginPage = () => {
       toast.success('Welcome back to VEDANCO AI!');
       navigate('/app/dashboard');
     } catch (err) {
-      toast.error(err.message || 'Invalid email or password');
+      toast.error(err?.message || (typeof err === 'string' ? err : 'Invalid email or password'));
     } finally {
       setIsLoading(false);
     }

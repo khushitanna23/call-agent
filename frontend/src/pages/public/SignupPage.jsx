@@ -31,7 +31,7 @@ export const SignupPage = () => {
       toast.success('Organization created successfully! Welcome to VEDANCO AI.');
       navigate('/app/dashboard');
     } catch (err) {
-      toast.error(err.message || 'Registration failed');
+      toast.error(err?.message || (typeof err === 'string' ? err : 'Registration failed'));
     } finally {
       setIsLoading(false);
     }
