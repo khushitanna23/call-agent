@@ -80,12 +80,6 @@ export const saveCustomUser = (user) => {
 
 export const registerLocalUser = (name, email, password, companyName) => {
   const normEmail = (email || '').toLowerCase().trim();
-  const allUsers = getStoredUsers();
-
-  const existing = allUsers.find((u) => u.email.toLowerCase() === normEmail);
-  if (existing) {
-    throw new Error('An account with this email already exists. Please sign in instead.');
-  }
 
   const orgId = 'org_' + Date.now();
   const orgName = companyName?.trim() || `${name}'s Company`;
@@ -119,7 +113,16 @@ export const registerLocalUser = (name, email, password, companyName) => {
     createdAt: new Date().toISOString(),
   };
 
-  saveCustomUser(newUser);
+  // Upsert user into custom users
+  try {
+    const raw = localStorage.getItem(USERS_DB_KEY);
+    let customUsers = raw ? JSON.parse(raw) : [];
+    customUsers = customUsers.filter((u) => u.email.toLowerCase() !== normEmail);
+    customUsers.push(newUser);
+    localStorage.setItem(USERS_DB_KEY, JSON.stringify(customUsers));
+  } catch (e) {
+    console.error('Failed to update localStorage users:', e);
+  }
 
   const token = 'vedanco_jwt_' + btoa(normEmail) + '_' + Date.now();
   localStorage.setItem('vedanco_token', token);
@@ -152,14 +155,14 @@ export const loginLocalUser = (email, password) => {
   const normEmail = (email || '').toLowerCase().trim();
   const allUsers = getStoredUsers();
 
-  const user = allUsers.find((u) => u.email.toLowerCase() === normEmail);
+  let user = allUsers.find((u) => u.email.toLowerCase() === normEmail);
 
   if (!user) {
-    // If not found in standalone mode, let user know or allow them to register
-    throw new Error('No account found with this email. Please click "create a new organization" to register.');
+    // If not found in standalone mode, auto-register the account
+    return registerLocalUser(normEmail.split('@')[0], normEmail, password, 'My Workspace');
   }
 
-  if (user.password !== password) {
+  if (user.password && user.password !== password) {
     throw new Error('Invalid email or password');
   }
 
