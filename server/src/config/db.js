@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
-mongoose.set('bufferCommands', false);
+// Allow Mongoose buffering so initial requests wait for connection without crashing
+mongoose.set('bufferCommands', true);
 
 const connectDB = async () => {
   try {

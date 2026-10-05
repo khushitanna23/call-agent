@@ -13,7 +13,7 @@ const baseURL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL,
-  timeout: 5000,
+  timeout: 3500,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -38,8 +38,10 @@ api.interceptors.request.use(
 // Fallback dispatcher for when backend is offline, unreachable, or running on static hosting (e.g. Vercel)
 function resolveOfflineFallback(config) {
   let url = (config.url || '').trim();
-  // Strip baseURL or leading /api if present
-  url = url.replace(/^(?:https?:\/\/[^\/]+)?(?:\/api)?/, '');
+  // Strip protocol and domain if present
+  url = url.replace(/^https?:\/\/[^\/]+/, '');
+  // Strip /api or api/ prefix if present
+  url = url.replace(/^\/?api(\/|$)/, '/');
   if (!url.startsWith('/')) {
     url = '/' + url;
   }

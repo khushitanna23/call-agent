@@ -4,6 +4,7 @@ echo Starting VEDANCO AI Services...
 echo ===================================================
 
 echo [1/3] Starting MongoDB...
+if not exist "C:\Users\ABC\mongodb_data" mkdir "C:\Users\ABC\mongodb_data"
 start "MongoDB Server" /min "C:\Program Files\MongoDB\Server\8.2\bin\mongod.exe" --dbpath "C:\Users\ABC\mongodb_data" --wiredTigerCacheSizeGB 0.25 --bind_ip 127.0.0.1
 timeout /t 3 /nobreak >nul
 
