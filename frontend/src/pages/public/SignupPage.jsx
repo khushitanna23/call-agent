@@ -78,7 +78,7 @@ export const SignupPage = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Alex Johnson"
+                  placeholder="Abc Xyz"
                   className="w-full bg-[#08080a] border border-emerald-950/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
                 />
               </div>
