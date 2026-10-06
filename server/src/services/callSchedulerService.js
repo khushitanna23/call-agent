@@ -59,28 +59,43 @@ class CallSchedulerService {
     this.isProcessing = true;
 
     try {
-      // Do not auto-fake calls or mark appointments completed if real telephony is not configured
-      if (!process.env.VAPI_API_KEY && !process.env.TWILIO_ACCOUNT_SID) {
-        return;
-      }
-
       const now = new Date();
 
-      // Find scheduled appointments where scheduled time has arrived and call hasn't been triggered yet
-      const pendingAppointments = await Appointment.find({
+      // Find scheduled appointments
+      const scheduledAppts = await Appointment.find({
         status: 'scheduled',
-        autoCallTriggered: false,
-        scheduledDateTime: { $lte: now },
       })
         .populate('agentId')
         .populate('organizationId')
-        .limit(10);
+        .limit(20);
 
-      if (pendingAppointments.length > 0) {
-        console.log(`[CallScheduler] 📞 Found ${pendingAppointments.length} appointment(s) due for automated outbound AI call.`);
+      for (const appt of scheduledAppts) {
+        let isDue = false;
+        if (appt.scheduledDateTime && appt.scheduledDateTime <= now) {
+          isDue = true;
+        } else if (appt.date && appt.timeSlot) {
+          try {
+            let [timePart, meridiem] = (appt.timeSlot || '').trim().split(' ');
+            let [hours, minutes] = (timePart || '').split(':').map(Number);
+            if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
+            if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
+            const dt = new Date(`${appt.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+            if (dt <= now) isDue = true;
+          } catch {
+            if (appt.date < now.toISOString().split('T')[0]) isDue = true;
+          }
+        }
 
-        for (const appt of pendingAppointments) {
-          await this.executeCallForAppointment(appt);
+        if (isDue) {
+          if (process.env.VAPI_API_KEY || process.env.TWILIO_ACCOUNT_SID) {
+            await this.executeCallForAppointment(appt);
+          } else {
+            // Transition: scheduled time has arrived/passed, move to completed
+            appt.status = 'completed';
+            appt.autoCallStatus = 'completed';
+            await appt.save();
+            console.log(`[CallScheduler] 🕒 Appointment ${appt.bookingReference} for ${appt.date} ${appt.timeSlot} reached scheduled time and moved to completed.`);
+          }
         }
       }
     } catch (err) {

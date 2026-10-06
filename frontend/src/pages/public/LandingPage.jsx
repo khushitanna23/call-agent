@@ -31,11 +31,12 @@ import { PublicFooter } from '../../components/layout/PublicFooter';
 import { LiveVoiceCallModal } from '../../components/voice/LiveVoiceCallModal';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
-import { Card } from '../../components/common/Card';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 
 export const LandingPage = () => {
+  const { isAuthenticated } = useAuth();
   const [voiceDemoOpen, setVoiceDemoOpen] = useState(false);
   const [activeFaq, setActiveFaq] = useState(null);
   const [selectedIndustry, setSelectedIndustry] = useState('Real Estate');
@@ -222,20 +223,21 @@ export const LandingPage = () => {
                 </Button>
 
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="lg"
-                  icon={Calendar}
-                  onClick={() => navigate('/book')}
+                  onClick={() => navigate('/login')}
+                  className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 font-bold"
                 >
-                  Schedule Appointment
+                  Login
                 </Button>
 
-                <Link
-                  to="/signup"
-                  className="inline-flex items-center justify-center text-sm font-semibold text-gray-400 hover:text-emerald-400 px-3 py-2 transition"
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  onClick={() => navigate('/signup')}
                 >
-                  Deploy in 5 min <ArrowRight className="w-4 h-4 ml-1.5" />
-                </Link>
+                  Get Started Free
+                </Button>
               </div>
 
               {/* Trust Badges */}

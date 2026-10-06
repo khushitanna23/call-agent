@@ -1379,6 +1379,11 @@ export const BookAppointmentPage = () => {
 
             {/* Bottom Actions */}
             <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+              <Link to="/app/appointments">
+                <Button variant="primary" size="md">
+                  View in Appointments Dashboard
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="md"

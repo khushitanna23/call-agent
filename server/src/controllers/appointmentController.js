@@ -233,10 +233,33 @@ exports.bookPublicAppointment = async (req, res, next) => {
     }
 
     // 2. Resolve Agent and Organization
+    let targetOrgId = req.organizationId;
+    if (!targetOrgId && req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      try {
+        const jwt = require('jsonwebtoken');
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'vedanco_super_secret_jwt_key_2026_prod_grade_token');
+        const User = require('../models/User');
+        const user = await User.findById(decoded.id);
+        if (user && user.organizationId) {
+          targetOrgId = user.organizationId;
+        }
+      } catch (err) {}
+    }
+
     let agent = null;
     if (agentId && agentId.match(/^[0-9a-fA-F]{24}$/)) {
       agent = await Agent.findById(agentId);
     }
+
+    if (targetOrgId) {
+      if (!agent || String(agent.organizationId) !== String(targetOrgId)) {
+        const orgAgent = (await Agent.findOne({ organizationId: targetOrgId, status: 'ONLINE' })) ||
+                         (await Agent.findOne({ organizationId: targetOrgId }));
+        if (orgAgent) agent = orgAgent;
+      }
+    }
+
     if (!agent) {
       agent = await Agent.findOne({ status: 'ONLINE' });
     }
@@ -244,9 +267,12 @@ exports.bookPublicAppointment = async (req, res, next) => {
       agent = await Agent.findOne();
     }
 
-    // If still no agent in DB, locate or create an organization first
+    // Resolve organization
     let organization = null;
-    if (agent) {
+    if (targetOrgId) {
+      organization = await Organization.findById(targetOrgId);
+    }
+    if (!organization && agent) {
       organization = await Organization.findById(agent.organizationId);
     }
     if (!organization) {
@@ -693,7 +719,8 @@ exports.downloadIcs = async (req, res, next) => {
 exports.getAppointments = async (req, res, next) => {
   try {
     const { status, date, search } = req.query;
-    const query = { organizationId: req.organizationId };
+    const directCount = await Appointment.countDocuments({ organizationId: req.organizationId });
+    const query = directCount > 0 ? { organizationId: req.organizationId } : {};
 
     if (status && status !== 'all') {
       query.status = status;
@@ -712,14 +739,70 @@ exports.getAppointments = async (req, res, next) => {
       ];
     }
 
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Auto-transition appointments whose scheduled time has arrived or passed to 'completed'
+    const scheduledAppts = await Appointment.find({
+      organizationId: req.organizationId,
+      status: 'scheduled',
+    });
+
+    const toCompleteIds = [];
+    for (const appt of scheduledAppts) {
+      let isPast = false;
+      if (appt.scheduledDateTime && appt.scheduledDateTime <= now) {
+        isPast = true;
+      } else if (appt.date && appt.timeSlot) {
+        try {
+          let [timePart, meridiem] = (appt.timeSlot || '').trim().split(' ');
+          let [hours, minutes] = (timePart || '').split(':').map(Number);
+          if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
+          if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
+          const dt = new Date(`${appt.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+          if (dt <= now) isPast = true;
+        } catch {
+          if (appt.date < todayStr) isPast = true;
+        }
+      }
+      if (isPast) {
+        toCompleteIds.push(appt._id);
+      }
+    }
+
+    if (toCompleteIds.length > 0) {
+      await Appointment.updateMany(
+        { _id: { $in: toCompleteIds } },
+        { $set: { status: 'completed', autoCallStatus: 'completed' } }
+      );
+    }
+
     const appointments = await Appointment.find(query)
       .populate('agentId', 'name type voice')
       .populate('leadId', 'name company email phone aiScore')
       .populate('callId')
       .sort({ date: 1, timeSlot: 1 });
 
-    const upcoming = appointments.filter((a) => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress');
-    const past = appointments.filter((a) => a.status === 'completed');
+    const isApptPast = (a) => {
+      if (a.status === 'completed') return true;
+      if (a.scheduledDateTime && a.scheduledDateTime <= now) return true;
+      if (a.date && a.timeSlot) {
+        try {
+          let [timePart, meridiem] = (a.timeSlot || '').trim().split(' ');
+          let [hours, minutes] = (timePart || '').split(':').map(Number);
+          if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
+          if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
+          const dt = new Date(`${a.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+          return dt <= now;
+        } catch {
+          return a.date < todayStr;
+        }
+      }
+      return false;
+    };
+
+    const upcoming = appointments.filter((a) => (a.status === 'scheduled' || a.status === 'confirmed') && !isApptPast(a));
+    const past = appointments.filter(isApptPast);
     const cancelled = appointments.filter((a) => a.status === 'cancelled');
 
     res.json({

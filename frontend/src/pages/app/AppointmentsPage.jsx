@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -60,10 +60,19 @@ export const AppointmentsPage = () => {
   });
 
   const toast = useToast();
+  const [, setClockTicker] = useState(Date.now());
 
   useEffect(() => {
     fetchAppointments();
     fetchAgents();
+
+    // Periodic auto-check every 20 seconds so appointments move to Completed in real-time
+    const timer = setInterval(() => {
+      setClockTicker(Date.now());
+      fetchAppointments();
+    }, 20000);
+
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
@@ -257,14 +266,32 @@ export const AppointmentsPage = () => {
     }
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const isApptPastTime = (a) => {
+    if (!a.date || !a.timeSlot) return false;
+    try {
+      let [timePart, meridiem] = (a.timeSlot || '').trim().split(' ');
+      let [hours, minutes] = (timePart || '').split(':').map(Number);
+      if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
+      if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      const apptDateTime = new Date(`${a.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
+      return apptDateTime <= new Date();
+    } catch {
+      return false;
+    }
+  };
+
+  const isCompletedOrPast = (a) => {
+    return a.status === 'completed' || (a.status === 'scheduled' && isApptPastTime(a));
+  };
+
+  const isUpcoming = (a) => {
+    return (a.status === 'scheduled' || a.status === 'confirmed') && !isApptPastTime(a);
+  };
 
   const filteredAppointments = appointments.filter((a) => {
-    if (activeTab === 'upcoming') {
-      return a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress';
-    }
+    if (activeTab === 'upcoming') return isUpcoming(a);
     if (activeTab === 'confirmed') return a.status === 'confirmed';
-    if (activeTab === 'completed') return a.status === 'completed';
+    if (activeTab === 'completed') return isCompletedOrPast(a);
     if (activeTab === 'rescheduled') return a.status === 'rescheduled';
     if (activeTab === 'cancelled') return a.status === 'cancelled';
     return true; // 'all'
@@ -338,15 +365,13 @@ export const AppointmentsPage = () => {
           <Button variant="outline" size="sm" icon={RotateCcw} onClick={fetchAppointments}>
             Refresh
           </Button>
-          <a
-            href="/book"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            to="/app/book"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Customer Booking Page (/book)</span>
-          </a>
+            <span>Booking Wizard</span>
+          </Link>
           <Button variant="primary" size="sm" icon={Plus} onClick={() => setBookModalOpen(true)}>
             Book Appointment
           </Button>
@@ -357,9 +382,9 @@ export const AppointmentsPage = () => {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 glass-card p-4 rounded-2xl border border-slate-800">
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
           {[
-            { id: 'upcoming', label: `Upcoming (${appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress').length})` },
+            { id: 'upcoming', label: `Upcoming (${appointments.filter(isUpcoming).length})` },
             { id: 'confirmed', label: `Confirmed (${appointments.filter(a => a.status === 'confirmed').length})` },
-            { id: 'completed', label: `Completed (${appointments.filter(a => a.status === 'completed').length})` },
+            { id: 'completed', label: `Completed (${appointments.filter(isCompletedOrPast).length})` },
             { id: 'rescheduled', label: `Rescheduled (${appointments.filter(a => a.status === 'rescheduled').length})` },
             { id: 'cancelled', label: `Cancelled (${appointments.filter(a => a.status === 'cancelled').length})` },
             { id: 'all', label: `All (${appointments.length})` },
@@ -521,8 +546,8 @@ export const AppointmentsPage = () => {
                       <h3 className="text-base font-bold text-white">{appt.customerName}</h3>
                       <p className="text-xs text-brand-cyan font-medium">{appt.type}</p>
                     </div>
-                    <Badge variant={statusVariant(appt.status)} size="xs">
-                      {appt.status}
+                    <Badge variant={statusVariant(isCompletedOrPast(appt) ? 'completed' : appt.status)} size="xs">
+                      {isCompletedOrPast(appt) ? 'completed' : appt.status}
                     </Badge>
                   </div>
 
@@ -606,8 +631,8 @@ export const AppointmentsPage = () => {
               <div>
                 <span className="text-[11px] text-slate-400 block">Status</span>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant={statusVariant(selectedAppt.status)} size="sm">
-                    {selectedAppt.status}
+                  <Badge variant={statusVariant(isCompletedOrPast(selectedAppt) ? 'completed' : selectedAppt.status)} size="sm">
+                    {isCompletedOrPast(selectedAppt) ? 'completed' : selectedAppt.status}
                   </Badge>
                   {selectedAppt.bookingReference && (
                     <span className="font-mono text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
@@ -849,14 +874,31 @@ export const AppointmentsPage = () => {
             </div>
             <div>
               <label className="block text-slate-300 font-semibold mb-1">Time Slot *</label>
-              <input
-                type="text"
+              <select
                 required
                 value={formData.timeSlot}
                 onChange={(e) => setFormData({ ...formData, timeSlot: e.target.value })}
-                placeholder="10:30 AM"
                 className="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-cyan"
-              />
+              >
+                <option value="09:00 AM">09:00 AM</option>
+                <option value="09:30 AM">09:30 AM</option>
+                <option value="10:00 AM">10:00 AM</option>
+                <option value="10:30 AM">10:30 AM</option>
+                <option value="11:00 AM">11:00 AM</option>
+                <option value="11:30 AM">11:30 AM</option>
+                <option value="12:00 PM">12:00 PM</option>
+                <option value="01:00 PM">01:00 PM</option>
+                <option value="01:30 PM">01:30 PM</option>
+                <option value="02:00 PM">02:00 PM</option>
+                <option value="02:30 PM">02:30 PM</option>
+                <option value="03:00 PM">03:00 PM</option>
+                <option value="03:30 PM">03:30 PM</option>
+                <option value="04:00 PM">04:00 PM</option>
+                <option value="04:30 PM">04:30 PM</option>
+                <option value="05:00 PM">05:00 PM</option>
+                <option value="05:30 PM">05:30 PM</option>
+                <option value="06:00 PM">06:00 PM</option>
+              </select>
             </div>
           </div>
 

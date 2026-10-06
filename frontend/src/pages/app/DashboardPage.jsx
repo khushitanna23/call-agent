@@ -141,6 +141,17 @@ export const DashboardPage = () => {
             Refresh
           </Button>
 
+          <Link to="/app/appointments?book=true">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={Calendar}
+              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10"
+            >
+              Book Appointment
+            </Button>
+          </Link>
+
           <Button
             variant="secondary"
             size="sm"

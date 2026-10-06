@@ -40,13 +40,36 @@ export const AppRoutes = () => {
     <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/book" element={<BookAppointmentPage />} />
-      <Route path="/schedule" element={<BookAppointmentPage />} />
-      <Route path="/book-appointment" element={<BookAppointmentPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+
+      {/* Booking Routes (Login Required) */}
+      <Route
+        path="/book"
+        element={
+          <ProtectedRoute>
+            <BookAppointmentPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/schedule"
+        element={
+          <ProtectedRoute>
+            <BookAppointmentPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/book-appointment"
+        element={
+          <ProtectedRoute>
+            <BookAppointmentPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Protected SaaS App Routes */}
       <Route
@@ -66,6 +89,7 @@ export const AppRoutes = () => {
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/:id" element={<LeadDetailPage />} />
         <Route path="appointments" element={<AppointmentsPage />} />
+        <Route path="book" element={<BookAppointmentPage />} />
         <Route path="knowledge" element={<KnowledgePage />} />
         <Route path="campaigns" element={<CampaignsPage />} />
         <Route path="automations" element={<AutomationsPage />} />
