@@ -224,11 +224,10 @@ export const LandingPage = () => {
                 <Button
                   variant="secondary"
                   size="lg"
-                  onClick={() => {
-                    document.getElementById('book-demo')?.scrollIntoView({ behavior: 'smooth' });
-                  }}
+                  icon={Calendar}
+                  onClick={() => navigate('/book')}
                 >
-                  Book a Demo
+                  Schedule Appointment
                 </Button>
 
                 <Link

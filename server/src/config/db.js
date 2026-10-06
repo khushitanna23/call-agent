@@ -4,17 +4,27 @@ const mongoose = require('mongoose');
 mongoose.set('bufferCommands', true);
 
 const connectDB = async () => {
+  const primaryUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/vedanco_ai';
   try {
-    const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/vedanco_ai';
-    const conn = await mongoose.connect(mongoUri, {
+    const conn = await mongoose.connect(primaryUri, {
       serverSelectionTimeoutMS: 5000,
     });
     console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}, database: ${conn.connection.name}`);
     return conn;
   } catch (error) {
-    console.error(`[MongoDB Connection Error] ${error.message}`);
-    console.warn('[MongoDB] Make sure MongoDB Server is running or check your MONGO_URI in .env');
-    // We don't exit hard immediately in development to allow diagnostic health checks
+    console.warn(`[MongoDB Primary Connection Failed] ${error.message}`);
+    if (primaryUri !== 'mongodb://127.0.0.1:27017/vedanco_ai') {
+      try {
+        console.log('[MongoDB] Falling back to local MongoDB (127.0.0.1:27017)...');
+        const fallbackConn = await mongoose.connect('mongodb://127.0.0.1:27017/vedanco_ai', {
+          serverSelectionTimeoutMS: 5000,
+        });
+        console.log(`[MongoDB] Connected successfully to local database: ${fallbackConn.connection.name}`);
+        return fallbackConn;
+      } catch (fallbackError) {
+        console.error(`[MongoDB Fallback Connection Error] ${fallbackError.message}`);
+      }
+    }
     return null;
   }
 };

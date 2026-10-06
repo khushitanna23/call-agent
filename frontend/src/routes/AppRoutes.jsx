@@ -13,6 +13,7 @@ import { PricingPage } from '../pages/public/PricingPage';
 import { DemoPage } from '../pages/public/DemoPage';
 import { LoginPage } from '../pages/public/LoginPage';
 import { SignupPage } from '../pages/public/SignupPage';
+import { BookAppointmentPage } from '../pages/public/BookAppointmentPage';
 
 // App Pages
 import { DashboardPage } from '../pages/app/DashboardPage';
@@ -39,6 +40,9 @@ export const AppRoutes = () => {
     <Routes>
       {/* Public Pages */}
       <Route path="/" element={<LandingPage />} />
+      <Route path="/book" element={<BookAppointmentPage />} />
+      <Route path="/schedule" element={<BookAppointmentPage />} />
+      <Route path="/book-appointment" element={<BookAppointmentPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/demo" element={<DemoPage />} />
       <Route path="/login" element={<LoginPage />} />

@@ -9,6 +9,7 @@ import {
   Trash2,
   CheckCircle2,
   RotateCcw,
+  Calendar,
 } from 'lucide-react';
 import { Card, CardHeader } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
@@ -130,6 +131,15 @@ export const AgentsPage = () => {
               >
                 {agent.status === 'ONLINE' ? 'Pause Agent' : 'Set Online'}
               </button>
+
+              <Link
+                to={`/app/appointments?book=true&agentId=${agent._id}`}
+                className="px-2.5 py-2 rounded-xl bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 text-xs font-semibold inline-flex items-center gap-1.5 transition"
+                title={`Schedule appointment with ${agent.name}`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Book</span>
+              </Link>
 
               <Link
                 to="/app/agents/new"

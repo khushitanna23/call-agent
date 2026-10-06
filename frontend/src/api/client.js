@@ -181,13 +181,269 @@ function resolveOfflineFallback(config) {
 
   // 10. Appointments
   if (pathOnly.startsWith('/appointments')) {
+    // 10a. Public Agents for booking
+    if (pathOnly.includes('/public/agents')) {
+      return {
+        success: true,
+        count: 4,
+        data: [
+          {
+            _id: 'agent_sarah_re',
+            name: 'Sarah',
+            type: 'receptionist',
+            industry: 'Real Estate & Property',
+            roleTitle: 'Real Estate & Showing Specialist',
+            description: 'Expert in scheduling property showings, pre-qualifying prospective buyers, and handling commercial leasing inquiries 24/7.',
+            avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
+            rating: 4.98,
+            reviewsCount: 342,
+            serviceType: 'Property Inquiry & Showing Consultation',
+            durationMinutes: 30,
+            voiceStyle: 'Warm, articulate, and executive',
+            responseTime: '< 1 second',
+            tags: ['Real Estate', 'Buyer Qualification', 'Open Houses'],
+            status: 'ONLINE',
+            phoneNumber: '+1 (800) 555-0199',
+          },
+          {
+            _id: 'agent_maya_health',
+            name: 'Dr. Maya Assistant',
+            type: 'receptionist',
+            industry: 'Healthcare & Wellness',
+            roleTitle: 'Clinical Intake & Patient Coordinator',
+            description: 'HIPAA-conscious patient scheduling, triage intake questionnaire routing, and consultation prep for medical and dental clinics.',
+            avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=400&q=80',
+            rating: 4.95,
+            reviewsCount: 218,
+            serviceType: 'Clinical Intake & Discovery Consultation',
+            durationMinutes: 30,
+            voiceStyle: 'Empathetic, calm, and reassuring',
+            responseTime: '< 1 second',
+            tags: ['Healthcare', 'Patient Triage', 'Doctor Calendar'],
+            status: 'ONLINE',
+            phoneNumber: '+1 (800) 555-0199',
+          },
+          {
+            _id: 'agent_david_corp',
+            name: 'David',
+            type: 'sales',
+            industry: 'Corporate & Consulting',
+            roleTitle: 'Enterprise AI & Automation Advisor',
+            description: 'Advises business owners and executives on deploying automated phone receptionists, CRM sync pipelines, and reducing call center costs.',
+            avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80',
+            rating: 4.99,
+            reviewsCount: 520,
+            serviceType: 'AI Receptionist Strategy & Architecture',
+            durationMinutes: 30,
+            voiceStyle: 'Sharp, authoritative, and consultative',
+            responseTime: '< 1 second',
+            tags: ['Consulting', 'ROI Assessment', 'Enterprise Demo'],
+            status: 'ONLINE',
+            phoneNumber: '+1 (800) 555-0199',
+          },
+          {
+            _id: 'agent_elena_dispatch',
+            name: 'Elena',
+            type: 'appointment_setter',
+            industry: 'Home Services & Contracting',
+            roleTitle: 'Service Dispatch & Quotation Specialist',
+            description: 'Specializes in urgent home service estimates, emergency dispatch, and booking on-site inspection visits.',
+            avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80',
+            rating: 4.94,
+            reviewsCount: 185,
+            serviceType: 'On-Site Inspection & Service Quote Call',
+            durationMinutes: 30,
+            voiceStyle: 'Energetic, efficient, and solution-oriented',
+            responseTime: '< 1 second',
+            tags: ['Home Services', 'Quotes', 'Emergency Dispatch'],
+            status: 'ONLINE',
+            phoneNumber: '+1 (800) 555-0199',
+          },
+        ],
+      };
+    }
+
+    // 10b. Public available slots
+    if (pathOnly.includes('/public/available-slots')) {
+      const date = config.params?.date || new Date().toISOString().split('T')[0];
+      const masterTimes = [
+        '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+        '01:00 PM', '01:30 PM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+        '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
+      ];
+      const bookedSet = new Set(['11:00 AM', '02:30 PM']);
+      const slots = masterTimes.map((t, i) => {
+        const isBooked = bookedSet.has(t);
+        const period = t.includes('AM') ? 'morning' : (parseInt(t) >= 4 ? 'evening' : 'afternoon');
+        return {
+          timeSlot: t,
+          time24: '10:00',
+          period,
+          durationMinutes: 30,
+          isAvailable: !isBooked,
+          reason: isBooked ? 'Already Booked' : null,
+        };
+      });
+      return {
+        success: true,
+        data: {
+          date,
+          totalSlots: slots.length,
+          availableCount: slots.filter((s) => s.isAvailable).length,
+          isFullyBooked: false,
+          slots,
+        },
+      };
+    }
+
+    // 10c. Public month availability
+    if (pathOnly.includes('/public/month-availability')) {
+      const days = {};
+      const today = new Date();
+      const currentYear = today.getFullYear();
+      const currentMonth = today.getMonth() + 1;
+      const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+      const todayStr = today.toISOString().split('T')[0];
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const isPast = dStr < todayStr;
+        const dayDate = new Date(`${dStr}T00:00:00`);
+        const isSunday = dayDate.getDay() === 0;
+        days[dStr] = {
+          date: dStr,
+          day: d,
+          isPast,
+          isSunday,
+          bookedCount: isPast ? 16 : (d === 15 ? 16 : 3),
+          availableSlots: isPast || isSunday ? 0 : (d === 15 ? 0 : 13),
+          isFullyBooked: d === 15,
+          isSelectable: !isPast && !isSunday && d !== 15,
+        };
+      }
+      return {
+        success: true,
+        data: { year: currentYear, month: currentMonth, daysInMonth, days },
+      };
+    }
+
+    // 10d. Public Book appointment
+    if (pathOnly.includes('/public/book')) {
+      const refId = 'VED-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+        (bodyData.serviceType || 'Consultation') + ' with ' + bodyData.customerName
+      )}&dates=20261010T100000Z/20261010T103000Z&details=${encodeURIComponent(
+        'AI Specialist call to ' + bodyData.customerPhone
+      )}`;
+      const newAppt = {
+        bookingReference: refId,
+        appointmentId: 'appt_' + Date.now(),
+        date: bodyData.date,
+        timeSlot: bodyData.timeSlot,
+        customerName: bodyData.customerName,
+        customerPhone: bodyData.customerPhone,
+        customerEmail: bodyData.customerEmail,
+        serviceType: bodyData.serviceType || 'Discovery Consultation',
+        requirement: bodyData.requirement,
+        durationMinutes: 30,
+        status: 'scheduled',
+        agent: {
+          name: 'Sarah',
+          roleTitle: 'Real Estate & Showing Specialist',
+          phoneNumber: '+1 (800) 555-0199',
+        },
+        googleCalendar: {
+          status: 'synced',
+          eventId: 'gcal_' + Date.now(),
+          addEventUrl: gcalUrl,
+        },
+        notification: {
+          emailSent: true,
+          smsSent: true,
+        },
+      };
+      return {
+        success: true,
+        message: 'Appointment successfully scheduled and synchronized with Google Calendar!',
+        data: newAppt,
+      };
+    }
+
+    // 10e. Lookup appointment
+    if (pathOnly.includes('/public/lookup/')) {
+      return {
+        success: true,
+        data: {
+          appointment: {
+            bookingReference: 'VED-A8K492',
+            customerName: 'Alex Mercer',
+            customerPhone: '+1 (555) 749-3921',
+            customerEmail: 'alex.mercer@example.com',
+            date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+            timeSlot: '02:00 PM',
+            serviceType: 'Property Showing & Buyer Consultation',
+            status: 'scheduled',
+            requirement: 'Inquiring regarding commercial leasing opportunities',
+            agentId: {
+              name: 'Sarah',
+              roleTitle: 'Real Estate Specialist',
+              phoneNumber: '+1 (800) 555-0199',
+            },
+            googleCalendarStatus: 'synced',
+          },
+          transcript: null,
+        },
+      };
+    }
+
+    // 10f. Trigger instant call
+    if (pathOnly.includes('/trigger-call')) {
+      return {
+        success: true,
+        message: 'Outbound AI call completed! AI Agent Sarah dialed caller and updated CRM records.',
+        data: {
+          call: { status: 'completed', durationSeconds: 165 },
+          transcript: [
+            { speaker: 'ai', text: 'Hello! This is Sarah calling from Vedanco AI for your scheduled appointment.', timestamp: '00:02' },
+            { speaker: 'caller', text: 'Hi Sarah! Thanks for calling on time.', timestamp: '00:07' },
+          ],
+        },
+      };
+    }
+
+    // 10g. Reschedule / Cancel public
+    if (pathOnly.includes('/public/reschedule/')) {
+      return {
+        success: true,
+        message: `Appointment successfully rescheduled to ${bodyData.newDate} at ${bodyData.newTimeSlot}`,
+      };
+    }
+    if (pathOnly.includes('/public/cancel/')) {
+      return {
+        success: true,
+        message: 'Appointment has been cancelled successfully.',
+      };
+    }
+
+    // Dashboard appointments handlers
     if (method === 'post') {
       const newAppt = {
         _id: 'appt_' + Date.now(),
+        bookingReference: 'VED-' + Math.random().toString(36).substring(2, 8).toUpperCase(),
+        date: bodyData.date || new Date().toISOString().split('T')[0],
+        timeSlot: bodyData.timeSlot || '10:30 AM',
+        customerName: bodyData.customerName || 'Client',
+        customerPhone: bodyData.customerPhone || bodyData.phone || '',
+        customerEmail: bodyData.customerEmail || bodyData.email || '',
+        type: bodyData.type || bodyData.appointmentType || 'Discovery Call',
         ...bodyData,
-        status: 'confirmed',
-        scheduledAt: bodyData.scheduledAt || new Date().toISOString(),
+        status: 'scheduled',
       };
+      try {
+        const stored = JSON.parse(localStorage.getItem('vedanco_custom_appts') || '[]');
+        stored.unshift(newAppt);
+        localStorage.setItem('vedanco_custom_appts', JSON.stringify(stored));
+      } catch (e) {}
       return { success: true, data: newAppt, message: 'Appointment created successfully' };
     }
     if (method === 'put' || method === 'patch') {
@@ -196,7 +452,24 @@ function resolveOfflineFallback(config) {
     if (method === 'delete') {
       return { success: true, message: 'Appointment cancelled successfully' };
     }
-    return { success: true, data: MOCK_APPOINTMENTS, total: MOCK_APPOINTMENTS.length };
+    try {
+      const stored = JSON.parse(localStorage.getItem('vedanco_custom_appts') || '[]');
+      const combined = [...stored, ...MOCK_APPOINTMENTS];
+      const upcoming = combined.filter((a) => a.status === 'scheduled' || a.status === 'confirmed');
+      return {
+        success: true,
+        data: combined,
+        counts: {
+          total: combined.length,
+          upcoming: upcoming.length,
+          past: combined.filter((a) => a.status === 'completed').length,
+          cancelled: combined.filter((a) => a.status === 'cancelled').length,
+        },
+        total: combined.length,
+      };
+    } catch (e) {
+      return { success: true, data: MOCK_APPOINTMENTS, total: MOCK_APPOINTMENTS.length };
+    }
   }
 
   // 11. Knowledge

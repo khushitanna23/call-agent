@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -17,6 +18,7 @@ import {
   Sparkles,
   AlertCircle,
   Edit2,
+  Bot,
 } from 'lucide-react';
 import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
@@ -26,8 +28,11 @@ import { useToast } from '../../context/ToastContext';
 import api from '../../api/client';
 
 export const AppointmentsPage = () => {
+  const [searchParams] = useSearchParams();
   const [appointments, setAppointments] = useState([]);
+  const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAgents, setLoadingAgents] = useState(false);
   const [activeTab, setActiveTab] = useState('upcoming'); // 'all', 'upcoming', 'confirmed', 'completed', 'rescheduled', 'cancelled'
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'calendar'
   const [bookModalOpen, setBookModalOpen] = useState(false);
@@ -43,11 +48,13 @@ export const AppointmentsPage = () => {
 
   // Booking form
   const [formData, setFormData] = useState({
+    agentId: '',
     customerName: '',
     customerPhone: '',
     customerEmail: '',
     date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
     timeSlot: '10:30 AM',
+    appointmentType: 'Discovery Call',
     type: 'Discovery Call',
     notes: 'Booked directly via appointment console.',
   });
@@ -56,7 +63,45 @@ export const AppointmentsPage = () => {
 
   useEffect(() => {
     fetchAppointments();
+    fetchAgents();
   }, []);
+
+  useEffect(() => {
+    // Detect context from URL query params (e.g. ?book=true&agentId=...)
+    const shouldOpenBook = searchParams.get('book') === 'true';
+    const paramAgentId = searchParams.get('agentId');
+    if (paramAgentId) {
+      setFormData((prev) => ({ ...prev, agentId: paramAgentId }));
+    }
+    if (shouldOpenBook) {
+      setBookModalOpen(true);
+    }
+  }, [searchParams]);
+
+  const fetchAgents = async () => {
+    try {
+      setLoadingAgents(true);
+      const res = await api.get('/agents');
+      if (res.data && res.data.length > 0) {
+        setAgents(res.data);
+        const paramAgentId = searchParams.get('agentId');
+        if (paramAgentId) {
+          setFormData((prev) => ({ ...prev, agentId: paramAgentId }));
+        } else {
+          // Preselect Sarah or first agent if available
+          const sarah = res.data.find((a) => a.name.toLowerCase() === 'sarah');
+          setFormData((prev) => ({
+            ...prev,
+            agentId: prev.agentId || (sarah ? sarah._id : res.data[0]._id),
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load agents:', err);
+    } finally {
+      setLoadingAgents(false);
+    }
+  };
 
   const fetchAppointments = async () => {
     try {
@@ -73,20 +118,42 @@ export const AppointmentsPage = () => {
 
   const handleBookSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.agentId) {
+      toast.error('Please select an AI Agent.');
+      return;
+    }
+
     try {
-      const res = await api.post('/appointments', formData);
+      const payload = {
+        customerName: formData.customerName.trim(),
+        phone: (formData.customerPhone || '').trim(),
+        customerPhone: (formData.customerPhone || '').trim(),
+        email: (formData.customerEmail || '').trim(),
+        customerEmail: (formData.customerEmail || '').trim(),
+        date: formData.date,
+        timeSlot: formData.timeSlot,
+        appointmentType: formData.appointmentType || formData.type || 'Discovery Call',
+        type: formData.appointmentType || formData.type || 'Discovery Call',
+        notes: formData.notes,
+        agentId: formData.agentId,
+      };
+
+      const res = await api.post('/appointments', payload);
       if (res.success) {
         toast.success('Appointment scheduled and synchronized with calendar!');
         setBookModalOpen(false);
-        setFormData({
+        setFormData((prev) => ({
+          agentId: prev.agentId,
           customerName: '',
           customerPhone: '',
           customerEmail: '',
           date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
           timeSlot: '10:30 AM',
+          appointmentType: 'Discovery Call',
           type: 'Discovery Call',
           notes: 'Booked directly via appointment console.',
-        });
+        }));
         fetchAppointments();
       }
     } catch (err) {
@@ -155,6 +222,24 @@ export const AppointmentsPage = () => {
     }
   };
 
+  const handleTriggerCallFromDashboard = async (id) => {
+    try {
+      setIsUpdatingStatus(true);
+      const res = await api.post(`/appointments/${id}/trigger-call`);
+      if (res.success) {
+        toast.success(res.message || 'Automated AI outbound call initiated and completed!');
+        fetchAppointments();
+        if (selectedAppt && selectedAppt._id === id) {
+          setSelectedAppt((prev) => ({ ...prev, status: 'completed' }));
+        }
+      }
+    } catch (err) {
+      toast.error(err.message || 'Failed to trigger outbound call');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const statusVariant = (status) => {
     switch (status) {
       case 'scheduled':
@@ -176,7 +261,7 @@ export const AppointmentsPage = () => {
 
   const filteredAppointments = appointments.filter((a) => {
     if (activeTab === 'upcoming') {
-      return (a.status === 'scheduled' || a.status === 'confirmed') && a.date >= todayStr;
+      return a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress';
     }
     if (activeTab === 'confirmed') return a.status === 'confirmed';
     if (activeTab === 'completed') return a.status === 'completed';
@@ -253,6 +338,15 @@ export const AppointmentsPage = () => {
           <Button variant="outline" size="sm" icon={RotateCcw} onClick={fetchAppointments}>
             Refresh
           </Button>
+          <a
+            href="/book"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>Customer Booking Page (/book)</span>
+          </a>
           <Button variant="primary" size="sm" icon={Plus} onClick={() => setBookModalOpen(true)}>
             Book Appointment
           </Button>
@@ -263,7 +357,7 @@ export const AppointmentsPage = () => {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 glass-card p-4 rounded-2xl border border-slate-800">
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto">
           {[
-            { id: 'upcoming', label: `Upcoming (${appointments.filter(a => (a.status === 'scheduled' || a.status === 'confirmed') && a.date >= todayStr).length})` },
+            { id: 'upcoming', label: `Upcoming (${appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'in_progress').length})` },
             { id: 'confirmed', label: `Confirmed (${appointments.filter(a => a.status === 'confirmed').length})` },
             { id: 'completed', label: `Completed (${appointments.filter(a => a.status === 'completed').length})` },
             { id: 'rescheduled', label: `Rescheduled (${appointments.filter(a => a.status === 'rescheduled').length})` },
@@ -511,13 +605,20 @@ export const AppointmentsPage = () => {
             <div className="flex items-center justify-between p-4 rounded-xl bg-navy-900 border border-slate-800">
               <div>
                 <span className="text-[11px] text-slate-400 block">Status</span>
-                <Badge variant={statusVariant(selectedAppt.status)} size="sm">
-                  {selectedAppt.status}
-                </Badge>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <Badge variant={statusVariant(selectedAppt.status)} size="sm">
+                    {selectedAppt.status}
+                  </Badge>
+                  {selectedAppt.bookingReference && (
+                    <span className="font-mono text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
+                      {selectedAppt.bookingReference}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="text-right">
                 <span className="text-[11px] text-slate-400 block">Consultation Type</span>
-                <span className="font-bold text-white text-sm">{selectedAppt.type}</span>
+                <span className="font-bold text-white text-sm">{selectedAppt.serviceType || selectedAppt.type}</span>
               </div>
             </div>
 
@@ -625,6 +726,18 @@ export const AppointmentsPage = () => {
                   </Button>
                 )}
 
+                {selectedAppt.status !== 'completed' && selectedAppt.status !== 'cancelled' && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={Phone}
+                    onClick={() => handleTriggerCallFromDashboard(selectedAppt._id)}
+                    isLoading={isUpdatingStatus}
+                  >
+                    Trigger Outbound AI Call
+                  </Button>
+                )}
+
                 {selectedAppt.status !== 'completed' && (
                   <Button
                     variant="success"
@@ -669,6 +782,24 @@ export const AppointmentsPage = () => {
         title="Schedule New Appointment"
       >
         <form onSubmit={handleBookSubmit} className="space-y-4 text-xs text-left">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1">Assigned AI Agent *</label>
+            <select
+              required
+              value={formData.agentId}
+              onChange={(e) => setFormData({ ...formData, agentId: e.target.value })}
+              className="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-cyan"
+            >
+              <option value="">-- Select an AI Agent --</option>
+              {agents.map((ag) => (
+                <option key={ag._id} value={ag._id}>
+                  {ag.name} — {ag.industry || ag.type} ({ag.type || 'Receptionist'})
+                </option>
+              ))}
+            </select>
+            {loadingAgents && <p className="text-[10px] text-slate-400 mt-1">Loading AI agents...</p>}
+          </div>
+
           <div>
             <label className="block text-slate-300 font-semibold mb-1">Customer Name *</label>
             <input

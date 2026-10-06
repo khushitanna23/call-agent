@@ -68,6 +68,8 @@ app.use((req, res, next) => {
 // Centralized error handler
 app.use(errorHandler);
 
+const callSchedulerService = require('./services/callSchedulerService');
+
 const PORT = process.env.PORT || 5000;
 
 const server = app.listen(PORT, () => {
@@ -76,11 +78,18 @@ const server = app.listen(PORT, () => {
   console.log(`📡 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 Allowed Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
   console.log(`====================================================`);
+
+  // Start automated appointment call scheduler
+  callSchedulerService.startScheduler();
 });
 
-// Handle unhandled promise rejections
+// Handle unhandled promise rejections & uncaught exceptions
 process.on('unhandledRejection', (err) => {
-  console.error(`[Unhandled Rejection] Error: ${err.message}`);
+  console.error(`[Unhandled Rejection] Error: ${err?.message || err}`);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error(`[Uncaught Exception] Error: ${err?.message || err}`);
 });
 
 module.exports = app;

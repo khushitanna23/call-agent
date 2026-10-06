@@ -26,12 +26,14 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
         </Link>
 
         {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+        <div className="hidden md:flex items-center gap-7 text-sm font-medium text-gray-300">
           <a href="#product" className="hover:text-emerald-400 transition">Product</a>
           <a href="#solutions" className="hover:text-emerald-400 transition">Solutions</a>
           <a href="#how-it-works" className="hover:text-emerald-400 transition">How It Works</a>
           <Link to="/pricing" className="hover:text-emerald-400 transition">Pricing</Link>
-          <a href="#faq" className="hover:text-emerald-400 transition">Resources</a>
+          <Link to="/book" className="text-emerald-400 hover:text-emerald-300 font-semibold transition flex items-center gap-1">
+            Book Appointment
+          </Link>
         </div>
 
         {/* CTA Buttons */}
@@ -55,16 +57,9 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
           <Button
             variant="primary"
             size="sm"
-            onClick={() => {
-              const demoSection = document.getElementById('book-demo');
-              if (demoSection) {
-                demoSection.scrollIntoView({ behavior: 'smooth' });
-              } else {
-                navigate('/demo');
-              }
-            }}
+            onClick={() => navigate('/book')}
           >
-            Book a Demo
+            Book Appointment
           </Button>
         </div>
 
@@ -119,13 +114,13 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
           >
             Pricing
           </Link>
-          <a
-            href="#faq"
+          <Link
+            to="/book"
             onClick={() => setMobileMenuOpen(false)}
-            className="text-base text-gray-300 hover:text-emerald-400 font-medium"
+            className="text-base text-emerald-400 hover:text-emerald-300 font-semibold"
           >
-            Resources
-          </a>
+            Book Appointment
+          </Link>
           <div className="pt-4 border-t border-emerald-950/60 flex flex-col gap-2.5">
             <Link
               to="/login"
