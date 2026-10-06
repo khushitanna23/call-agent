@@ -26,7 +26,12 @@ import api from '../../api/client';
 
 export const KnowledgePage = () => {
   const [documents, setDocuments] = useState([]);
+  const [agents, setAgents] = useState([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
   const [loading, setLoading] = useState(true);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [sourceStats, setSourceStats] = useState({});
+  const [lastSynced, setLastSynced] = useState(null);
   const [activeTab, setActiveTab] = useState('all');
 
   // Quick Action Modal States
@@ -47,8 +52,8 @@ export const KnowledgePage = () => {
 
   // Specific Forms
   const [faqData, setFaqData] = useState({ question: '', answer: '' });
-  const [serviceData, setServiceData] = useState({ name: '', description: '', deliverables: '' });
-  const [pricingData, setPricingData] = useState({ planName: '', price: '', details: '' });
+  const [serviceData, setServiceData] = useState({ name: '', description: '', price: '', duration: '', deliverables: '' });
+  const [pricingData, setPricingData] = useState({ planName: '', price: '', currency: 'INR', details: '' });
 
   // Generic Text Knowledge Form
   const [textData, setTextData] = useState({
@@ -65,15 +70,36 @@ export const KnowledgePage = () => {
   const toast = useToast();
 
   useEffect(() => {
+    fetchAgents();
+  }, []);
+
+  useEffect(() => {
     fetchKnowledge();
-  }, [activeTab]);
+  }, [activeTab, selectedAgentId]);
+
+  const fetchAgents = async () => {
+    try {
+      const res = await api.get('/agents');
+      const nextAgents = Array.isArray(res.data) ? res.data : [];
+      setAgents(nextAgents);
+      if (!selectedAgentId && nextAgents[0]?._id) setSelectedAgentId(nextAgents[0]._id);
+    } catch (err) {
+      toast.error('Failed to load AI agents');
+    }
+  };
 
   const fetchKnowledge = async () => {
     try {
       setLoading(true);
-      const url = `/knowledge?type=${activeTab}`;
+      const url = `/knowledge?type=${activeTab}${selectedAgentId ? `&agentId=${selectedAgentId}` : ''}`;
       const res = await api.get(url);
-      if (res.data) setDocuments(res.data);
+      const nextDocuments = Array.isArray(res.data) ? res.data : res.items || [];
+      setDocuments(nextDocuments);
+      setTotalChunks(
+        res.totalChunks ?? nextDocuments.reduce((total, document) => total + (document.chunksCount || 1), 0)
+      );
+      setSourceStats(res.stats || {});
+      setLastSynced(new Date());
     } catch (err) {
       toast.error('Failed to load knowledge documents');
     } finally {
@@ -84,7 +110,7 @@ export const KnowledgePage = () => {
   const handleCreateText = async (e) => {
     e.preventDefault();
     try {
-      const res = await api.post('/knowledge', textData);
+      const res = await api.post('/knowledge', { ...textData, agentId: selectedAgentId || undefined });
       if (res.success) {
         toast.success(`Knowledge item added and chunked into ${res.data.chunksCount || 1} units.`);
         setAddModalOpen(false);
@@ -107,6 +133,7 @@ export const KnowledgePage = () => {
     formData.append('file', selectedFile);
     formData.append('title', selectedFile.name);
     formData.append('type', 'document');
+    if (selectedAgentId) formData.append('agentId', selectedAgentId);
 
     try {
       setIsUploading(true);
@@ -134,18 +161,30 @@ export const KnowledgePage = () => {
       let extractedText = '';
       try {
         const scrapeRes = await api.post('/agents/scrape-website', { url: websiteUrl });
-        if (scrapeRes.data) {
-          const d = scrapeRes.data;
-          extractedText = `Company: ${d.companyName || ''}\nDescription: ${d.description || ''}\nServices: ${
-            d.extractedServices?.join(', ') || ''
-          }`;
+        const d = scrapeRes.data || scrapeRes;
+        if (d && (d.companyName || d.description || d.summary)) {
+          const faqText = (d.faqs || [])
+            .map((faq) => `Q: ${faq.question}\nA: ${faq.answer}`)
+            .join('\n');
+          extractedText = [
+            `Company: ${d.companyName || ''}`,
+            `Description: ${d.description || d.summary || ''}`,
+            `Services: ${(d.extractedServices || d.services || []).join(', ')}`,
+            `Business hours: ${d.businessHours || ''}`,
+            `Contact: ${d.contactEmail || ''} ${d.phone || ''}`,
+            faqText,
+          ]
+            .filter(Boolean)
+            .join('\n');
         }
       } catch (err) {
         // Fallback default content if offline
         extractedText = `Scraped contents from ${websiteUrl}. Business documentation and website profile.`;
       }
 
-      const res = await api.post('/knowledge', {
+      const res = await api.post('/knowledge/websites', {
+        url: websiteUrl,
+        agentId: selectedAgentId || undefined,
         title: `Website: ${websiteUrl.replace(/^https?:\/\//, '')}`,
         content: extractedText || `Website content scraped from ${websiteUrl}`,
         type: 'website',
@@ -174,6 +213,8 @@ export const KnowledgePage = () => {
         title: faqData.question,
         content: `Q: ${faqData.question}\nA: ${faqData.answer}`,
         type: 'faq',
+        agentId: selectedAgentId || undefined,
+        structuredData: { question: faqData.question, answer: faqData.answer },
       });
       if (res.success) {
         toast.success('FAQ entry saved and vectorized!');
@@ -192,17 +233,27 @@ export const KnowledgePage = () => {
 
     try {
       const content = `Service: ${serviceData.name}\nDescription: ${serviceData.description}${
+        serviceData.price ? `\nPrice: ${serviceData.price}` : ''
+      }${serviceData.duration ? `\nDuration: ${serviceData.duration}` : ''}${
         serviceData.deliverables ? `\nDeliverables & Scope: ${serviceData.deliverables}` : ''
       }`;
       const res = await api.post('/knowledge', {
         title: serviceData.name,
         content,
         type: 'service',
+        agentId: selectedAgentId || undefined,
+        structuredData: {
+          name: serviceData.name,
+          description: serviceData.description,
+          price: serviceData.price,
+          duration: serviceData.duration,
+          deliverables: serviceData.deliverables,
+        },
       });
       if (res.success) {
         toast.success('Service catalog entry saved!');
         setServiceModalOpen(false);
-        setServiceData({ name: '', description: '', deliverables: '' });
+        setServiceData({ name: '', description: '', price: '', duration: '', deliverables: '' });
         fetchKnowledge();
       }
     } catch (err) {
@@ -215,18 +266,20 @@ export const KnowledgePage = () => {
     if (!pricingData.planName || !pricingData.price) return;
 
     try {
-      const content = `Tier: ${pricingData.planName}\nPrice: ${pricingData.price}${
+      const content = `Service/Product: ${pricingData.planName}\nPrice: ${pricingData.currency} ${pricingData.price}${
         pricingData.details ? `\nDetails & Inclusions: ${pricingData.details}` : ''
       }`;
       const res = await api.post('/knowledge', {
         title: `${pricingData.planName} Pricing`,
         content,
         type: 'pricing',
+        agentId: selectedAgentId || undefined,
+        structuredData: { service: pricingData.planName, price: pricingData.price, currency: pricingData.currency, details: pricingData.details },
       });
       if (res.success) {
         toast.success('Pricing plan indexed!');
         setPricingModalOpen(false);
-        setPricingData({ planName: '', price: '', details: '' });
+        setPricingData({ planName: '', price: '', currency: 'INR', details: '' });
         fetchKnowledge();
       }
     } catch (err) {
@@ -251,7 +304,7 @@ export const KnowledgePage = () => {
 
     try {
       setIsSearching(true);
-      const res = await api.post('/knowledge/search', { query: searchQuery });
+      const res = await api.post('/knowledge/search', { query: searchQuery, agentId: selectedAgentId || undefined });
       setSearchResults(res.results || []);
       if (res.results?.length === 0) {
         toast.info('No matching chunks found for query');
@@ -274,12 +327,11 @@ export const KnowledgePage = () => {
   ];
 
   // Sources calculations
-  const totalChunks = documents.reduce((acc, d) => acc + (d.chunksCount || 1), 0);
-  const websiteCount = documents.filter((d) => d.type === 'website').length;
-  const docCount = documents.filter((d) => d.type === 'document').length;
-  const faqCount = documents.filter((d) => d.type === 'faq').length;
-  const serviceCount = documents.filter((d) => d.type === 'service').length;
-  const pricingCount = documents.filter((d) => d.type === 'pricing').length;
+  const websiteCount = sourceStats.website ?? documents.filter((d) => d.type === 'website').length;
+  const docCount = sourceStats.document ?? documents.filter((d) => d.type === 'document').length;
+  const faqCount = sourceStats.faq ?? documents.filter((d) => d.type === 'faq').length;
+  const serviceCount = sourceStats.service ?? documents.filter((d) => d.type === 'service').length;
+  const pricingCount = sourceStats.pricing ?? documents.filter((d) => d.type === 'pricing').length;
 
   return (
     <div className="space-y-8 animate-in fade-in">
@@ -292,6 +344,19 @@ export const KnowledgePage = () => {
           <p className="text-xs sm:text-sm text-gray-400 mt-1">
             Train your AI Receptionist with company documentation, policies, website content, service catalogs, and pricing.
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="knowledge-agent" className="text-[11px] text-slate-400 whitespace-nowrap">Agent</label>
+          <select
+            id="knowledge-agent"
+            value={selectedAgentId}
+            onChange={(event) => setSelectedAgentId(event.target.value)}
+            className="bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-brand-cyan"
+          >
+            <option value="">Unassigned sources</option>
+            {agents.map((agent) => <option key={agent._id} value={agent._id}>{agent.name}</option>)}
+          </select>
         </div>
 
         {/* 5 Quick-Action Buttons */}
@@ -344,14 +409,31 @@ export const KnowledgePage = () => {
           >
             Custom Text
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={RotateCcw}
+            onClick={fetchKnowledge}
+            isLoading={loading}
+            title="Refresh knowledge sources"
+          >
+            Refresh
+          </Button>
         </div>
+      </div>
+
+      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+        <span>{lastSynced ? `Synced ${lastSynced.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Syncing knowledge sources'}</span>
+        <span className="text-slate-700">•</span>
+        <span>Changes are indexed for AI retrieval</span>
       </div>
 
       {/* Explicit Knowledge Source Overview Cards (Master Plan Requirement) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card className="p-4">
           <span className="text-[11px] text-slate-400 block font-medium">Total Sources</span>
-          <span className="text-2xl font-extrabold text-white mt-1 block">{documents.length}</span>
+          <span className="text-2xl font-extrabold text-white mt-1 block">{sourceStats.total ?? documents.length}</span>
           <span className="text-[10px] text-slate-500 mt-0.5 block">Active items</span>
         </Card>
         <Card className="p-4">
@@ -428,10 +510,11 @@ export const KnowledgePage = () => {
               {searchResults.map((chunk, i) => (
                 <div key={i} className="p-3 rounded-xl bg-navy-900 border border-slate-800 text-xs">
                   <div className="flex items-center justify-between text-[10px] text-brand-cyan mb-1">
-                    <span>Chunk #{chunk.chunkIndex ?? i + 1}</span>
-                    <span className="text-slate-500">{chunk.metadata?.type || 'chunk'}</span>
+                    <span>{chunk.metadata?.title || `Chunk #${chunk.chunkIndex ?? i + 1}`}</span>
+                    <span className="text-slate-500">{chunk.relevance != null ? `${chunk.relevance}% relevant` : chunk.metadata?.type || 'chunk'}</span>
                   </div>
                   <p className="text-slate-200">{chunk.content}</p>
+                  <span className="text-[10px] text-slate-500 mt-2 block">{chunk.metadata?.source || 'manual'} · {chunk.metadata?.type || 'knowledge'}</span>
                 </div>
               ))}
             </div>
@@ -458,7 +541,15 @@ export const KnowledgePage = () => {
 
       {/* Documents Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {documents.length === 0 ? (
+        {loading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="p-6 h-56 animate-pulse">
+              <div className="h-4 w-2/3 rounded bg-slate-800" />
+              <div className="h-3 w-1/3 rounded bg-slate-800 mt-3" />
+              <div className="h-16 rounded bg-slate-800/70 mt-8" />
+            </Card>
+          ))
+        ) : documents.length === 0 ? (
           <div className="col-span-full py-16 text-center text-slate-500 text-xs">
             <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-40 text-brand-cyan" />
             No knowledge records found in this category. Use the quick-action buttons above to add content.
@@ -484,9 +575,11 @@ export const KnowledgePage = () => {
                     </div>
                     <div>
                       <h3 className="text-sm font-bold text-white line-clamp-1">{doc.title}</h3>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        Source: {doc.source || 'manual'}
-                      </span>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
+                        <span>Source: {doc.source || 'manual'}</span>
+                        {doc.fileSize ? <span>• {(doc.fileSize / 1024).toFixed(0)} KB</span> : null}
+                        {doc.createdAt ? <span>• {new Date(doc.createdAt).toLocaleDateString()}</span> : null}
+                      </div>
                     </div>
                   </div>
                   <Badge variant="cyan" size="xs">
@@ -500,7 +593,19 @@ export const KnowledgePage = () => {
               </div>
 
               <div className="mt-4 pt-2 flex items-center justify-between text-[11px] text-slate-500">
-                <span>{doc.chunksCount || 1} Chunks Indexed</span>
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-brand-cyan" />
+                  {doc.chunksCount || 1} Chunks Indexed
+                </span>
+                <span className="flex items-center gap-1 text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {doc.status || 'ready'}
+                </span>
+                {doc.type === 'website' && doc.source?.startsWith('http') ? (
+                  <a href={doc.source} target="_blank" rel="noreferrer" className="text-slate-500 hover:text-brand-cyan" title="Open source website">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                ) : null}
                 <button
                   onClick={() => handleDelete(doc._id)}
                   className="p-1 text-slate-500 hover:text-rose-400 transition"
@@ -652,6 +757,29 @@ export const KnowledgePage = () => {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Price</label>
+              <input
+                type="text"
+                value={serviceData.price}
+                onChange={(e) => setServiceData({ ...serviceData, price: e.target.value })}
+                placeholder="e.g. Starts at ₹50,000"
+                className="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-cyan"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Duration</label>
+              <input
+                type="text"
+                value={serviceData.duration}
+                onChange={(e) => setServiceData({ ...serviceData, duration: e.target.value })}
+                placeholder="e.g. 4-6 weeks"
+                className="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-cyan"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-slate-300 font-semibold mb-1">Deliverables & Scope</label>
             <input
@@ -681,7 +809,7 @@ export const KnowledgePage = () => {
         title="Add Pricing Plan & Rate Card"
       >
         <form onSubmit={handleAddPricing} className="space-y-4 text-xs text-left">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-slate-300 font-semibold mb-1">Plan / Rate Name *</label>
               <input
@@ -703,6 +831,19 @@ export const KnowledgePage = () => {
                 placeholder="e.g. $89 flat rate (waived with repair)"
                 className="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-cyan"
               />
+            </div>
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1">Currency</label>
+              <select
+                value={pricingData.currency}
+                onChange={(e) => setPricingData({ ...pricingData, currency: e.target.value })}
+                className="w-full bg-navy-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-brand-cyan"
+              >
+                <option value="INR">INR ₹</option>
+                <option value="USD">USD $</option>
+                <option value="EUR">EUR €</option>
+                <option value="GBP">GBP £</option>
+              </select>
             </div>
           </div>
 

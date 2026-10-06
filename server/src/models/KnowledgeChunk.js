@@ -39,5 +39,6 @@ const KnowledgeChunkSchema = new mongoose.Schema(
 );
 
 KnowledgeChunkSchema.index({ organizationId: 1, content: 'text' });
+KnowledgeChunkSchema.index({ organizationId: 1, agentId: 1, documentId: 1 });
 
 module.exports = mongoose.model('KnowledgeChunk', KnowledgeChunkSchema);

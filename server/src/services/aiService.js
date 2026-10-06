@@ -18,21 +18,60 @@ class AIService {
     return this.openaiProvider || this.mockProvider;
   }
 
+  async generateEmbedding(text) {
+    return this.getProvider().generateEmbedding(text);
+  }
+
+  cosineSimilarity(left, right) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return 0;
+    let dot = 0;
+    let leftMagnitude = 0;
+    let rightMagnitude = 0;
+    for (let index = 0; index < left.length; index += 1) {
+      dot += left[index] * right[index];
+      leftMagnitude += left[index] * left[index];
+      rightMagnitude += right[index] * right[index];
+    }
+    return leftMagnitude && rightMagnitude ? dot / Math.sqrt(leftMagnitude * rightMagnitude) : 0;
+  }
+
   /**
    * Search knowledge base chunks for relevant context
    */
-  async retrieveKnowledge(organizationId, query, limit = 4) {
+  async retrieveKnowledge(organizationId, query, limit = 4, agentId = null) {
     try {
       if (!query || !organizationId) return [];
-      const regex = new RegExp(query.split(' ').filter((w) => w.length > 2).join('|'), 'i');
-      const chunks = await KnowledgeChunk.find({
-        organizationId,
+      const scope = { organizationId, agentId: agentId || null };
+      const chunks = await KnowledgeChunk.find(scope).select('+embedding').lean();
+      if (chunks.length === 0) return [];
+
+      const queryEmbedding = await this.generateEmbedding(query);
+      const threshold = this.openaiProvider
+        ? Number(process.env.KNOWLEDGE_SIMILARITY_THRESHOLD || 0.55)
+        : Number(process.env.KNOWLEDGE_LOCAL_SIMILARITY_THRESHOLD || 0.12);
+      const ranked = chunks
+        .filter((chunk) => Array.isArray(chunk.embedding) && chunk.embedding.length > 0)
+        .map((chunk) => ({
+          ...chunk,
+          relevance: this.cosineSimilarity(queryEmbedding, chunk.embedding),
+        }))
+        .filter((chunk) => chunk.relevance >= threshold)
+        .sort((left, right) => right.relevance - left.relevance)
+        .slice(0, limit);
+
+      if (ranked.length > 0) return ranked;
+
+      const terms = query.split(/\s+/).filter((word) => word.length > 2);
+      if (terms.length === 0) return [];
+      const regex = new RegExp(terms.join('|'), 'i');
+      const lexicalMatches = await KnowledgeChunk.find({
+        ...scope,
         $or: [{ content: { $regex: regex } }, { 'metadata.title': { $regex: regex } }],
       })
         .limit(limit)
         .lean();
 
-      return chunks;
+      return lexicalMatches.map((chunk) => ({ ...chunk, relevance: 0.5 }));
     } catch (err) {
       console.warn('[AIService retrieveKnowledge Error]', err.message);
       return [];
@@ -70,7 +109,9 @@ CRITICAL OPERATIONAL RULES:
 1. Always be welcoming and concise. This is a real-time voice call.
 2. If the user asks for a price or service not in your knowledge, offer to take their details for a personalized quote.
 3. If they ask to speak to a person, execute a human call transfer.
-4. Extract caller details (name, phone, requirements, timeframe) when appropriate.`,
+4. Extract caller details (name, phone, requirements, timeframe) when appropriate.
+5. Never invent company-specific prices, services, policies, availability, or contact information.
+6. If the relevant knowledge is not provided above, clearly say you do not have that verified information and offer a human follow-up.`,
     };
   }
 
@@ -82,7 +123,7 @@ CRITICAL OPERATIONAL RULES:
 
     switch (toolName) {
       case 'searchKnowledge': {
-        const results = await this.retrieveKnowledge(organizationId, params.query);
+        const results = await this.retrieveKnowledge(organizationId, params.query, 4, agentId);
         return {
           success: true,
           tool: 'searchKnowledge',
@@ -275,7 +316,12 @@ CRITICAL OPERATIONAL RULES:
    */
   async generateAIResponse({ messages, agent, organizationId, context = {} }) {
     const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')?.content || '';
-    const knowledgeChunks = await this.retrieveKnowledge(organizationId, lastUserMessage);
+    const knowledgeChunks = await this.retrieveKnowledge(
+      organizationId,
+      lastUserMessage,
+      4,
+      context.agentId || agent?._id || null
+    );
     const systemPrompt = this.buildAgentContext(agent, knowledgeChunks);
 
     const fullMessages = [systemPrompt, ...messages.filter((m) => m.role !== 'system')];

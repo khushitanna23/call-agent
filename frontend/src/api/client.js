@@ -201,19 +201,132 @@ function resolveOfflineFallback(config) {
 
   // 11. Knowledge
   if (pathOnly.startsWith('/knowledge')) {
+    const storageKey = 'vedanco_knowledge_documents';
+    const defaultDocuments = [
+      {
+        _id: 'knowledge_demo_faq',
+        agentId: 'agent_sarah_1',
+        type: 'faq',
+        title: 'How do I schedule an appointment?',
+        content: 'Sarah can schedule a 15, 30, or 45-minute discovery consultation during the call. Clients receive an SMS and calendar invitation immediately.',
+        source: 'seed_knowledge',
+        status: 'ready',
+        chunksCount: 1,
+        createdAt: '2026-01-12T10:00:00.000Z',
+        updatedAt: '2026-01-12T10:00:00.000Z',
+      },
+      {
+        _id: 'knowledge_demo_pricing',
+        agentId: 'agent_sarah_1',
+        type: 'pricing',
+        title: 'Service Plans & Minute Packages',
+        content: 'Starter is $99 per month for 300 minutes. Growth is $249 per month for 1,000 minutes and CRM integrations. Business is $599 per month for 3,000 minutes and custom voice cloning.',
+        source: 'seed_knowledge',
+        status: 'ready',
+        chunksCount: 1,
+        createdAt: '2026-01-10T10:00:00.000Z',
+        updatedAt: '2026-01-10T10:00:00.000Z',
+      },
+      {
+        _id: 'knowledge_demo_policy',
+        agentId: 'agent_sarah_1',
+        type: 'policy',
+        title: 'Appointment Booking & Cancellation Policy',
+        content: 'Cancellations or rescheduling require at least 2 hours advance notice. Clients can request a new time by phone or through the calendar invitation.',
+        source: 'seed_knowledge',
+        status: 'ready',
+        chunksCount: 1,
+        createdAt: '2026-01-08T10:00:00.000Z',
+        updatedAt: '2026-01-08T10:00:00.000Z',
+      },
+    ];
+
+    const readDocuments = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
+        if (Array.isArray(stored)) return stored;
+      } catch {
+        // Restore the demo repository when local data is malformed.
+      }
+      localStorage.setItem(storageKey, JSON.stringify(defaultDocuments));
+      return defaultDocuments;
+    };
+
+    const writeDocuments = (documents) => {
+      localStorage.setItem(storageKey, JSON.stringify(documents));
+      return documents;
+    };
+
     if (pathOnly.includes('/search')) {
-      return { success: true, results: [] };
+      const query = String(bodyData.query || '').trim().toLowerCase();
+      const terms = query.split(/\s+/).filter((term) => term.length > 2);
+      const agentId = bodyData.agentId || 'agent_sarah_1';
+      const results = readDocuments()
+        .filter((document) => document.agentId === agentId)
+        .filter((document) => {
+          const haystack = `${document.title} ${document.content} ${document.source || ''}`.toLowerCase();
+          return terms.length > 0 && terms.some((term) => haystack.includes(term));
+        })
+        .slice(0, 5)
+        .map((document, index) => ({
+          documentId: document._id,
+          chunkIndex: index,
+          content: document.content,
+          metadata: { title: document.title, type: document.type, source: document.source },
+        }));
+      return { success: true, count: results.length, query, results };
     }
     if (pathOnly.includes('/upload')) {
-      return { success: true, message: 'Document uploaded and indexed successfully' };
+      const file = config.data?.get?.('file');
+      const title = config.data?.get?.('title') || file?.name || 'Uploaded document';
+      const now = new Date().toISOString();
+      const document = {
+        _id: `knowledge_${Date.now()}`,
+        agentId: config.data?.get?.('agentId') || 'agent_sarah_1',
+        type: config.data?.get?.('type') || 'document',
+        title,
+        content: `Uploaded ${file?.name || title}. Add the production API to extract PDF or DOCX text automatically.`,
+        source: file?.name || title,
+        fileType: file?.name?.split('.').pop()?.toLowerCase() || 'text',
+        fileSize: file?.size || 0,
+        status: 'ready',
+        chunksCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      };
+      writeDocuments([document, ...readDocuments()]);
+      return { success: true, message: 'Document uploaded and indexed successfully', data: document };
     }
     if (method === 'post') {
-      return { success: true, message: 'Knowledge document added successfully' };
+      const now = new Date().toISOString();
+      const document = {
+        _id: `knowledge_${Date.now()}`,
+        ...bodyData,
+        source: bodyData.source || 'manual',
+        status: 'ready',
+        chunksCount: Math.max(1, Math.ceil(String(bodyData.content || '').length / 500)),
+        createdAt: now,
+        updatedAt: now,
+      };
+      writeDocuments([document, ...readDocuments()]);
+      return { success: true, message: 'Knowledge document added successfully', data: document };
     }
     if (method === 'delete') {
+      writeDocuments(readDocuments().filter((document) => document._id !== pathOnly.split('/').pop()));
       return { success: true, message: 'Knowledge document deleted successfully' };
     }
-    return { success: true, data: [], items: [] };
+    const type = new URLSearchParams(url.split('?')[1] || '').get('type');
+    const documents = readDocuments().filter((document) => !type || type === 'all' || document.type === type);
+    const agentId = new URLSearchParams(url.split('?')[1] || '').get('agentId') || 'agent_sarah_1';
+    const scopedDocuments = documents.filter((document) => document.agentId === agentId);
+    return {
+      success: true,
+      count: scopedDocuments.length,
+      totalChunks: scopedDocuments.reduce((total, document) => total + (document.chunksCount || 1), 0),
+      stats: scopedDocuments.reduce((stats, document) => ({ ...stats, [document.type]: (stats[document.type] || 0) + 1, total: scopedDocuments.length }), {}),
+      data: scopedDocuments,
+      items: scopedDocuments,
+    };
   }
 
   // 12. Billing
@@ -307,6 +420,15 @@ api.interceptors.response.use(
         }
       } catch (fallbackError) {
         return Promise.reject(fallbackError);
+      }
+    }
+
+    const storedToken = localStorage.getItem('vedanco_token');
+    const isLocalDemoToken = storedToken?.startsWith('vedanco_jwt_');
+    if (status === 401 && isLocalDemoToken && config) {
+      const fallback = resolveOfflineFallback(config);
+      if (fallback !== undefined) {
+        return Promise.resolve(fallback);
       }
     }
 

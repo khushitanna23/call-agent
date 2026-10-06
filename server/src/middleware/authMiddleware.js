@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Organization = require('../models/Organization');
+const OrganizationMember = require('../models/OrganizationMember');
 
 const protect = async (req, res, next) => {
   let token;
@@ -34,9 +35,24 @@ const protect = async (req, res, next) => {
       req.user = user;
       req.organizationId = user.organizationId;
 
-      // Allow tenant switching if header provided and valid
+      // Tenant switching is allowed only for the authenticated user's own organization
+      // or an active organization membership.
       if (req.headers['x-organization-id']) {
-        req.organizationId = req.headers['x-organization-id'];
+        const requestedOrganizationId = req.headers['x-organization-id'];
+        if (String(requestedOrganizationId) !== String(user.organizationId)) {
+          const membership = await OrganizationMember.findOne({
+            organizationId: requestedOrganizationId,
+            userId: user._id,
+            status: 'active',
+          }).select('_id');
+          if (!membership) {
+            return res.status(403).json({
+              success: false,
+              message: 'You do not have access to this organization',
+            });
+          }
+        }
+        req.organizationId = requestedOrganizationId;
       }
 
       next();

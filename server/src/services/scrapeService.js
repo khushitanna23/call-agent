@@ -34,12 +34,28 @@ class ScrapeService {
         console.log(`[ScrapeService] Direct fetch failed for ${url} (${fetchErr.message}), generating smart contextual profile.`);
       }
 
-      // Extract details or build realistic contextual business knowledge profile
+      const cleanHtml = (html) => {
+        const withoutNoise = html
+          .replace(/<(script|style|noscript|nav|footer|header)[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+          .replace(/<!--([\s\S]*?)-->/g, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/gi, ' ')
+          .replace(/&amp;/gi, '&')
+          .replace(/&quot;/gi, '"')
+          .replace(/&#39;/gi, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+        return withoutNoise.slice(0, 30000);
+      };
+      const pageText = cleanHtml(fetchedContent);
+
+      // Use real page text when available; keep a useful profile for unreachable demo URLs.
       return {
         companyName: companyName,
         url: url,
         title: `${companyName} | Official Website`,
-        description: `${companyName} delivers high-quality professional solutions and exceptional client care.`,
+        description: pageText || `${companyName} delivers high-quality professional solutions and exceptional client care.`,
+        text: pageText,
         suggestedGreeting: `Thank you for calling ${companyName}. My name is Sarah, your AI Receptionist. How may I direct your call today?`,
         suggestedSystemInstructions: `You are the AI Receptionist for ${companyName}. Assist callers with service questions, qualify their requirements, provide transparent information, and book discovery consultations.`,
         extractedServices: [

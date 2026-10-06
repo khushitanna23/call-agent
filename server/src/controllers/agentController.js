@@ -109,6 +109,9 @@ exports.createAgent = async (req, res, next) => {
             title: item.title || 'Initial Knowledge',
             content: item.content,
             source: 'wizard_setup',
+            status: 'indexed',
+            chunksCount: 1,
+            indexedAt: new Date(),
           });
 
           await KnowledgeChunk.create({
@@ -116,6 +119,7 @@ exports.createAgent = async (req, res, next) => {
             documentId: doc._id,
             agentId: agent._id,
             content: item.content,
+            embedding: await aiService.generateEmbedding(item.content),
             metadata: { title: doc.title, type: doc.type },
           });
         }
@@ -185,10 +189,11 @@ exports.testAgent = async (req, res, next) => {
   try {
     const { messages = [] } = req.body;
     let agent = null;
+    const requestedAgentId = req.params.id !== 'sandbox' ? req.params.id : req.body.agentId;
 
-    if (req.params.id !== 'sandbox') {
+    if (requestedAgentId) {
       agent = await Agent.findOne({
-        _id: req.params.id,
+        _id: requestedAgentId,
         organizationId: req.organizationId,
       });
     }

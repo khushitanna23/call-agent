@@ -7,6 +7,10 @@ class AIProvider {
   async generateCompletion({ messages, temperature, maxTokens, tools }) {
     throw new Error('generateCompletion method must be implemented by subclass');
   }
+
+  async generateEmbedding() {
+    throw new Error('generateEmbedding method must be implemented by subclass');
+  }
 }
 
 class OpenAIProvider extends AIProvider {
@@ -54,6 +58,30 @@ class OpenAIProvider extends AIProvider {
       throw err;
     }
   }
+
+  async generateEmbedding(text) {
+    if (!this.apiKey) throw new Error('OpenAI API key not configured');
+
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+        input: text,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'OpenAI embedding request failed');
+    }
+
+    const data = await response.json();
+    return data.data?.[0]?.embedding || [];
+  }
 }
 
 class MockAIProvider extends AIProvider {
@@ -87,7 +115,9 @@ class MockAIProvider extends AIProvider {
       lowerText.includes('fee') ||
       lowerText.includes('plan')
     ) {
-      reply = `Our service packages start at $99/month for our Starter plan with 300 voice minutes, and $249/month for Growth with 1,000 minutes and CRM integrations. May I ask what specific capabilities your business needs so I can tailor the best recommendation?`;
+      reply = knowledgeChunks.length > 0
+        ? `${knowledgeChunks.map((chunk) => chunk.content).slice(0, 2).join(' ')} Would you like help choosing the right option?`
+        : `I do not have a verified pricing detail for that yet. I can take your contact details and have a specialist follow up with an accurate quote.`;
       triggeredTool = 'searchKnowledge';
       toolPayload = { query: 'pricing plans' };
     } else if (
@@ -108,7 +138,7 @@ class MockAIProvider extends AIProvider {
     ) {
       const knowledgeSummary = knowledgeChunks.length > 0 
         ? knowledgeChunks.map(c => c.content).slice(0, 2).join(' ') 
-        : 'We specialize in AI Employees that answer 100% of customer calls, qualify leads, book appointments into your calendar, and integrate seamlessly with your CRM 24/7.';
+        : 'I do not have verified information about that service in my knowledge base yet.';
       reply = `We provide end-to-end automated customer operations: ${knowledgeSummary}. We ensure you never miss another customer inquiry! Could I get your name and email to send over our product deck?`;
       triggeredTool = 'getBusinessInfo';
     } else if (
@@ -140,6 +170,24 @@ class MockAIProvider extends AIProvider {
       toolPayload,
       usage: { prompt_tokens: 45, completion_tokens: 38, total_tokens: 83 },
     };
+  }
+
+  async generateEmbedding(text) {
+    const dimensions = 64;
+    const vector = Array(dimensions).fill(0);
+    const tokens = String(text || '').toLowerCase().match(/[a-z0-9$₹]+/g) || [];
+
+    tokens.forEach((token) => {
+      let hash = 2166136261;
+      for (let index = 0; index < token.length; index += 1) {
+        hash ^= token.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      vector[Math.abs(hash) % dimensions] += 1;
+    });
+
+    const magnitude = Math.sqrt(vector.reduce((sum, value) => sum + value * value, 0)) || 1;
+    return vector.map((value) => value / magnitude);
   }
 }
 

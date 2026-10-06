@@ -29,6 +29,10 @@ const KnowledgeDocumentSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    structuredData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     source: {
       type: String,
       default: 'manual', // or URL, or uploaded filename
@@ -42,9 +46,11 @@ const KnowledgeDocumentSchema = new mongoose.Schema(
     fileSize: Number,
     status: {
       type: String,
-      enum: ['processing', 'ready', 'failed'],
+      enum: ['pending', 'processing', 'indexed', 'ready', 'failed'],
       default: 'ready',
     },
+    processingError: String,
+    indexedAt: Date,
     chunksCount: {
       type: Number,
       default: 1,
