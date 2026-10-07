@@ -26,12 +26,26 @@ exports.handleIncomingVoiceCall = async (req, res, next) => {
 // @access  Public
 exports.handleVoiceCallEvents = async (req, res, next) => {
   try {
-    const { callId, status, durationSeconds } = req.body;
-    if (callId && (status === 'completed' || status === 'ended')) {
-      await voiceService.completeCall(callId, durationSeconds || 90);
-    }
-    res.json({ success: true, received: true });
+    console.log('[Webhook] Voice event received:', JSON.stringify(req.body).slice(0, 300));
+    const result = await voiceService.handleVapiWebhookEvent(req.body);
+    res.json({ success: true, ...result });
   } catch (error) {
-    next(error);
+    console.error('[Voice Events Webhook Error]', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// @desc    Dedicated Vapi Webhook Endpoint
+// @route   POST /api/webhooks/vapi
+// @access  Public
+exports.handleVapiWebhook = async (req, res, next) => {
+  try {
+    const eventType = req.body?.message?.type || req.body?.type || 'unknown';
+    console.log(`[Webhook] Vapi Webhook received: ${eventType}`);
+    const result = await voiceService.handleVapiWebhookEvent(req.body);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('[Vapi Webhook Error]', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 };

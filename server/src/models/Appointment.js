@@ -80,7 +80,7 @@ const AppointmentSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['scheduled', 'in_progress', 'completed', 'cancelled', 'rescheduled'],
+      enum: ['scheduled', 'calling', 'in_progress', 'completed', 'cancelled', 'rescheduled', 'failed', 'no_answer'],
       default: 'scheduled',
       index: true,
     },
@@ -118,11 +118,39 @@ const AppointmentSchema = new mongoose.Schema(
     },
     autoCallStatus: {
       type: String,
-      enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled'],
+      enum: ['pending', 'calling', 'in_progress', 'completed', 'failed', 'no_answer', 'cancelled'],
       default: 'pending',
     },
     autoCallInitiatedAt: {
       type: Date,
+    },
+    vapiCallId: {
+      type: String,
+      index: true,
+    },
+    callStartedAt: {
+      type: Date,
+    },
+    callEndedAt: {
+      type: Date,
+    },
+    callStatus: {
+      type: String,
+    },
+    callTranscript: {
+      type: String,
+    },
+    callSummary: {
+      type: String,
+    },
+    callRecordingUrl: {
+      type: String,
+    },
+    callDurationSeconds: {
+      type: Number,
+    },
+    callEndedReason: {
+      type: String,
     },
     cancellationReason: {
       type: String,

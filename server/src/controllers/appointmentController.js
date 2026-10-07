@@ -739,71 +739,16 @@ exports.getAppointments = async (req, res, next) => {
       ];
     }
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
-    // Auto-transition appointments whose scheduled time has arrived or passed to 'completed'
-    const scheduledAppts = await Appointment.find({
-      organizationId: req.organizationId,
-      status: 'scheduled',
-    });
-
-    const toCompleteIds = [];
-    for (const appt of scheduledAppts) {
-      let isPast = false;
-      if (appt.scheduledDateTime && appt.scheduledDateTime <= now) {
-        isPast = true;
-      } else if (appt.date && appt.timeSlot) {
-        try {
-          let [timePart, meridiem] = (appt.timeSlot || '').trim().split(' ');
-          let [hours, minutes] = (timePart || '').split(':').map(Number);
-          if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
-          if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
-          const dt = new Date(`${appt.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
-          if (dt <= now) isPast = true;
-        } catch {
-          if (appt.date < todayStr) isPast = true;
-        }
-      }
-      if (isPast) {
-        toCompleteIds.push(appt._id);
-      }
-    }
-
-    if (toCompleteIds.length > 0) {
-      await Appointment.updateMany(
-        { _id: { $in: toCompleteIds } },
-        { $set: { status: 'completed', autoCallStatus: 'completed' } }
-      );
-    }
-
     const appointments = await Appointment.find(query)
       .populate('agentId', 'name type voice')
       .populate('leadId', 'name company email phone aiScore')
       .populate('callId')
       .sort({ date: 1, timeSlot: 1 });
 
-    const isApptPast = (a) => {
-      if (a.status === 'completed') return true;
-      if (a.scheduledDateTime && a.scheduledDateTime <= now) return true;
-      if (a.date && a.timeSlot) {
-        try {
-          let [timePart, meridiem] = (a.timeSlot || '').trim().split(' ');
-          let [hours, minutes] = (timePart || '').split(':').map(Number);
-          if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
-          if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
-          const dt = new Date(`${a.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
-          return dt <= now;
-        } catch {
-          return a.date < todayStr;
-        }
-      }
-      return false;
-    };
-
-    const upcoming = appointments.filter((a) => (a.status === 'scheduled' || a.status === 'confirmed') && !isApptPast(a));
-    const past = appointments.filter(isApptPast);
+    const upcoming = appointments.filter((a) => a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'calling');
+    const completed = appointments.filter((a) => a.status === 'completed');
     const cancelled = appointments.filter((a) => a.status === 'cancelled');
+    const failed = appointments.filter((a) => a.status === 'failed' || a.status === 'no_answer');
 
     res.json({
       success: true,
@@ -811,8 +756,10 @@ exports.getAppointments = async (req, res, next) => {
       counts: {
         total: appointments.length,
         upcoming: upcoming.length,
-        past: past.length,
+        completed: completed.length,
+        past: completed.length,
         cancelled: cancelled.length,
+        failed: failed.length,
       },
       data: appointments,
     });

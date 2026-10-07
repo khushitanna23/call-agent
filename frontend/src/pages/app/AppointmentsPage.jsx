@@ -253,6 +253,8 @@ export const AppointmentsPage = () => {
     switch (status) {
       case 'scheduled':
         return 'emerald';
+      case 'calling':
+        return 'amber';
       case 'confirmed':
         return 'cyan';
       case 'completed':
@@ -261,37 +263,26 @@ export const AppointmentsPage = () => {
         return 'amber';
       case 'cancelled':
         return 'rose';
+      case 'failed':
+        return 'rose';
+      case 'no_answer':
+        return 'amber';
       default:
         return 'default';
     }
   };
 
-  const isApptPastTime = (a) => {
-    if (!a.date || !a.timeSlot) return false;
-    try {
-      let [timePart, meridiem] = (a.timeSlot || '').trim().split(' ');
-      let [hours, minutes] = (timePart || '').split(':').map(Number);
-      if (meridiem && meridiem.toUpperCase() === 'PM' && hours < 12) hours += 12;
-      if (meridiem && meridiem.toUpperCase() === 'AM' && hours === 12) hours = 0;
-      const apptDateTime = new Date(`${a.date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00`);
-      return apptDateTime <= new Date();
-    } catch {
-      return false;
-    }
-  };
-
-  const isCompletedOrPast = (a) => {
-    return a.status === 'completed' || (a.status === 'scheduled' && isApptPastTime(a));
-  };
+  const isCompleted = (a) => a.status === 'completed';
 
   const isUpcoming = (a) => {
-    return (a.status === 'scheduled' || a.status === 'confirmed') && !isApptPastTime(a);
+    return a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'calling';
   };
 
   const filteredAppointments = appointments.filter((a) => {
     if (activeTab === 'upcoming') return isUpcoming(a);
+    if (activeTab === 'calling') return a.status === 'calling';
     if (activeTab === 'confirmed') return a.status === 'confirmed';
-    if (activeTab === 'completed') return isCompletedOrPast(a);
+    if (activeTab === 'completed') return isCompleted(a);
     if (activeTab === 'rescheduled') return a.status === 'rescheduled';
     if (activeTab === 'cancelled') return a.status === 'cancelled';
     return true; // 'all'
@@ -384,7 +375,8 @@ export const AppointmentsPage = () => {
           {[
             { id: 'upcoming', label: `Upcoming (${appointments.filter(isUpcoming).length})` },
             { id: 'confirmed', label: `Confirmed (${appointments.filter(a => a.status === 'confirmed').length})` },
-            { id: 'completed', label: `Completed (${appointments.filter(isCompletedOrPast).length})` },
+            { id: 'calling', label: `Calling (${appointments.filter(a => a.status === 'calling').length})` },
+            { id: 'completed', label: `Completed (${appointments.filter(isCompleted).length})` },
             { id: 'rescheduled', label: `Rescheduled (${appointments.filter(a => a.status === 'rescheduled').length})` },
             { id: 'cancelled', label: `Cancelled (${appointments.filter(a => a.status === 'cancelled').length})` },
             { id: 'all', label: `All (${appointments.length})` },
@@ -546,8 +538,8 @@ export const AppointmentsPage = () => {
                       <h3 className="text-base font-bold text-white">{appt.customerName}</h3>
                       <p className="text-xs text-brand-cyan font-medium">{appt.type}</p>
                     </div>
-                    <Badge variant={statusVariant(isCompletedOrPast(appt) ? 'completed' : appt.status)} size="xs">
-                      {isCompletedOrPast(appt) ? 'completed' : appt.status}
+                    <Badge variant={statusVariant(appt.status)} size="xs">
+                      {appt.status === 'calling' ? 'Calling...' : appt.status}
                     </Badge>
                   </div>
 
@@ -631,8 +623,8 @@ export const AppointmentsPage = () => {
               <div>
                 <span className="text-[11px] text-slate-400 block">Status</span>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant={statusVariant(isCompletedOrPast(selectedAppt) ? 'completed' : selectedAppt.status)} size="sm">
-                    {isCompletedOrPast(selectedAppt) ? 'completed' : selectedAppt.status}
+                  <Badge variant={statusVariant(selectedAppt.status)} size="sm">
+                    {selectedAppt.status === 'calling' ? 'Calling...' : selectedAppt.status}
                   </Badge>
                   {selectedAppt.bookingReference && (
                     <span className="font-mono text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">
@@ -696,6 +688,78 @@ export const AppointmentsPage = () => {
                 >
                   Open <ExternalLink className="w-3.5 h-3.5" />
                 </a>
+              </div>
+            )}
+
+            {/* Real Outbound AI Voice Call Status / Telephony Details */}
+            {(selectedAppt.vapiCallId || selectedAppt.status === 'calling' || selectedAppt.callTranscript || selectedAppt.callSummary || selectedAppt.callEndedReason) && (
+              <div className="p-3.5 rounded-xl bg-navy-900 border border-slate-700/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded bg-brand-cyan/10 text-brand-cyan">
+                      <Phone className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="text-[11px] font-bold text-white uppercase tracking-wider">
+                      AI Phone Call (Vapi Telephony)
+                    </span>
+                  </div>
+                  {selectedAppt.status === 'calling' && (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-[10px]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                      Calling in progress...
+                    </span>
+                  )}
+                  {selectedAppt.status === 'completed' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold text-[10px]">
+                      <CheckCircle2 className="w-3 h-3" /> Call Completed
+                    </span>
+                  )}
+                  {selectedAppt.status === 'failed' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold text-[10px]">
+                      <XCircle className="w-3 h-3" /> Call Failed
+                    </span>
+                  )}
+                  {selectedAppt.status === 'no_answer' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-[10px]">
+                      <AlertCircle className="w-3 h-3" /> No Answer
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-300">
+                  {selectedAppt.vapiCallId && (
+                    <div className="bg-navy-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px]">Vapi Call ID:</span>
+                      <span className="truncate block font-semibold text-emerald-400">{selectedAppt.vapiCallId}</span>
+                    </div>
+                  )}
+                  {selectedAppt.callDurationSeconds > 0 && (
+                    <div className="bg-navy-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px]">Call Duration:</span>
+                      <span className="font-semibold text-white">{selectedAppt.callDurationSeconds}s</span>
+                    </div>
+                  )}
+                  {selectedAppt.callEndedReason && (
+                    <div className="bg-navy-950 p-2 rounded border border-slate-800 col-span-2">
+                      <span className="text-slate-500 block text-[10px]">End Reason:</span>
+                      <span className="text-slate-300">{selectedAppt.callEndedReason}</span>
+                    </div>
+                  )}
+                </div>
+
+                {selectedAppt.callSummary && (
+                  <div className="bg-navy-950 p-2.5 rounded border border-slate-800 text-[11px]">
+                    <span className="text-slate-400 font-bold block mb-1">Call AI Summary:</span>
+                    <p className="text-slate-300 leading-relaxed">{selectedAppt.callSummary}</p>
+                  </div>
+                )}
+
+                {selectedAppt.callTranscript && (
+                  <div className="bg-navy-950 p-2.5 rounded border border-slate-800 text-[11px]">
+                    <span className="text-slate-400 font-bold block mb-1">Conversation Transcript:</span>
+                    <p className="text-slate-400 leading-relaxed font-mono whitespace-pre-wrap max-h-36 overflow-y-auto">{selectedAppt.callTranscript}</p>
+                  </div>
+                )}
               </div>
             )}
 

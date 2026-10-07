@@ -94,12 +94,125 @@ class VapiVoiceProvider extends VoiceProvider {
     };
   }
 
-  async startCall(config) {
-    return {
-      provider: 'vapi',
-      callId: 'vapi_' + Date.now(),
-      status: 'initiated',
+  async startOutboundCall(config) {
+    if (!this.apiKey) {
+      throw new Error('VAPI_API_KEY is not configured in server environment.');
+    }
+
+    const {
+      phoneNumberId,
+      assistantId,
+      customerNumber,
+      customerName,
+      agentConfig,
+      appointment,
+      serverUrl,
+    } = config;
+
+    if (!customerNumber) {
+      throw new Error('Customer phone number is required for Vapi outbound call.');
+    }
+
+    if (!phoneNumberId) {
+      throw new Error('VAPI_PHONE_NUMBER_ID is not configured in server environment.');
+    }
+
+    const payload = {
+      phoneNumberId: phoneNumberId,
+      customer: {
+        number: customerNumber,
+        name: customerName || 'Valued Client',
+      },
     };
+
+    if (serverUrl) {
+      payload.serverUrl = serverUrl;
+    }
+
+    if (assistantId) {
+      payload.assistantId = assistantId;
+      payload.assistantOverrides = {
+        variableValues: {
+          customerName: customerName || 'Valued Client',
+          appointmentDate: appointment?.date || '',
+          appointmentTime: appointment?.timeSlot || '',
+          serviceType: appointment?.serviceType || 'Consultation Call',
+          requirement: appointment?.requirement || 'General Consultation',
+          bookingReference: appointment?.bookingReference || '',
+        },
+      };
+    } else {
+      // Dynamic Sarah AI assistant definition
+      const agentName = agentConfig?.name || 'Sarah';
+      const firstGreeting =
+        agentConfig?.greetingMessage ||
+        `Hello ${customerName || ''}! This is Sarah calling from Vedanco AI for your scheduled consultation. Can you hear me clearly?`;
+
+      const promptContent =
+        agentConfig?.systemInstructions ||
+        `You are Sarah, an intelligent AI Receptionist and Intake Specialist for Vedanco AI. You are placing an automated scheduled outbound call to ${customerName || 'the client'} regarding their booked appointment for ${appointment?.serviceType || 'Consultation'} scheduled on ${appointment?.date || 'today'} at ${appointment?.timeSlot || ''}.
+Your objectives:
+1. Greet the customer warmly and confirm you are speaking with ${customerName || 'them'}.
+2. Explain that you are calling for their scheduled consultation session.
+3. Discuss their requirement: "${appointment?.requirement || 'general business consultation'}".
+4. Answer any questions about services and pricing with clarity and professional confidence.
+5. Summarize next steps and thank them for their time.`;
+
+      payload.assistant = {
+        name: agentName,
+        firstMessage: firstGreeting,
+        model: {
+          provider: 'openai',
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'system', content: promptContent }],
+        },
+        voice: {
+          provider: '11labs',
+          voiceId: agentConfig?.voice?.voiceId || '21m00Tcm4TlvDq8ikWAM',
+        },
+      };
+    }
+
+    console.log(`[Vapi] Outbound call payload:`, {
+      phoneNumberId: payload.phoneNumberId,
+      assistantId: payload.assistantId || 'inline-assistant',
+      customerNumber: payload.customer.number,
+      customerName: payload.customer.name,
+    });
+
+    const response = await fetch(`${this.baseUrl}/call/phone`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseData = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const errorMsg =
+        responseData.message ||
+        responseData.error ||
+        `Vapi API call failed with status HTTP ${response.status}: ${JSON.stringify(responseData)}`;
+      console.error('[Vapi Error] Call initiation failed:', errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    console.log(`[Vapi] Outbound call initiated successfully! Call ID: ${responseData.id}`);
+
+    return {
+      success: true,
+      provider: 'vapi',
+      callId: responseData.id,
+      status: responseData.status || 'queued',
+      data: responseData,
+    };
+  }
+
+  async startCall(config) {
+    return this.startOutboundCall(config);
   }
 
   async endCall(callId) {
