@@ -11,13 +11,16 @@ const AppointmentSchema = new mongoose.Schema(
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
-      required: true,
+      index: true,
+    },
+    orgId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
       index: true,
     },
     agentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Agent',
-      required: true,
       index: true,
     },
     leadId: {
@@ -32,35 +35,46 @@ const AppointmentSchema = new mongoose.Schema(
       type: String,
       default: 'Discovery Consultation',
     },
+    callerName: {
+      type: String,
+      trim: true,
+    },
     customerName: {
       type: String,
-      required: [true, 'Customer name is required'],
+      trim: true,
+    },
+    callerPhone: {
+      type: String,
       trim: true,
     },
     customerPhone: {
       type: String,
-      required: [true, 'Customer phone number is required'],
       trim: true,
     },
     customerEmail: {
       type: String,
-      required: [true, 'Customer email is required'],
       trim: true,
       lowercase: true,
+      default: '',
     },
     requirement: {
       type: String,
       trim: true,
       default: '',
     },
+    scheduledDate: {
+      type: String, // YYYY-MM-DD
+      index: true,
+    },
     date: {
       type: String, // YYYY-MM-DD
-      required: true,
       index: true,
+    },
+    scheduledTime: {
+      type: String, // HH:mm or 10:30 AM
     },
     timeSlot: {
       type: String, // e.g. "10:30 AM" or "02:00 PM"
-      required: true,
     },
     scheduledDateTime: {
       type: Date,
@@ -169,6 +183,29 @@ const AppointmentSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save hook to synchronize aliases and ensure clean bookingReference
+AppointmentSchema.pre('save', function (next) {
+  if (this.orgId && !this.organizationId) this.organizationId = this.orgId;
+  if (this.organizationId && !this.orgId) this.orgId = this.organizationId;
+
+  if (this.callerName && !this.customerName) this.customerName = this.callerName;
+  if (this.customerName && !this.callerName) this.callerName = this.customerName;
+
+  if (this.callerPhone && !this.customerPhone) this.customerPhone = this.callerPhone;
+  if (this.customerPhone && !this.callerPhone) this.callerPhone = this.customerPhone;
+
+  if (this.scheduledDate && !this.date) this.date = this.scheduledDate;
+  if (this.date && !this.scheduledDate) this.scheduledDate = this.date;
+
+  if (this.scheduledTime && !this.timeSlot) this.timeSlot = this.scheduledTime;
+  if (this.timeSlot && !this.scheduledTime) this.scheduledTime = this.timeSlot;
+
+  if (!this.bookingReference) {
+    this.bookingReference = this.constructor.generateReference();
+  }
+  next();
+});
 
 // Compound index for slot uniqueness checks
 AppointmentSchema.index({ agentId: 1, date: 1, timeSlot: 1, status: 1 });

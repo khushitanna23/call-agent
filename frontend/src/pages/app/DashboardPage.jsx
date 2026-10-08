@@ -82,9 +82,9 @@ export const DashboardPage = () => {
     try {
       toast.info('Simulating incoming customer call...');
       const res = await api.post('/calls/simulate', {
-        callerName: 'Marcus Aurelius',
-        callerNumber: '+1 (555) ' + Math.floor(100 + Math.random() * 900) + '-4499',
-        intent: 'Appointment & Pricing Consultation',
+        callerName: 'Inbound Caller',
+        callerNumber: '+1 (800) ' + Math.floor(100 + Math.random() * 900) + '-4499',
+        intent: 'Appointment & Consultation Inquiry',
       });
       if (res.success) {
         toast.success('Inbound call processed, qualified, and synchronized with CRM!');
@@ -214,17 +214,25 @@ export const DashboardPage = () => {
             <div className="bg-navy-900/80 p-3 rounded-2xl border border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Calls Today</span>
               <span className="text-xl font-extrabold text-white mt-0.5 block">
-                {agent?.totalCallsCount || 24}
+                {agent?.totalCallsCount ?? 0}
               </span>
               <span className="text-[10px] text-emerald-400 flex items-center justify-center gap-0.5 mt-0.5">
                 <TrendingUp className="w-2.5 h-2.5" /> 100% answered
               </span>
             </div>
 
-            <div className="bg-navy-900/80 p-3 rounded-2xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block font-medium">Minutes Used</span>
+            <div className="bg-navy-900/80 p-3 rounded-2xl border border-slate-800 relative group">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400 block font-medium">Minutes Used</span>
+                <Link
+                  to="/app/billing"
+                  className="text-[10px] text-brand-cyan hover:underline font-semibold"
+                >
+                  + Refill
+                </Link>
+              </div>
               <span className="text-xl font-extrabold text-brand-cyan mt-0.5 block">
-                {organization?.minutesUsed || 142}m
+                {organization?.minutesUsed ?? 0}m
               </span>
               <span className="text-[10px] text-slate-400 block mt-0.5">
                 of {organization?.minutesAllowance || 1000}m
@@ -234,17 +242,17 @@ export const DashboardPage = () => {
             <div className="bg-navy-900/80 p-3 rounded-2xl border border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Leads Captured</span>
               <span className="text-xl font-extrabold text-indigo-400 mt-0.5 block">
-                {metrics?.leadsCount || 29}
+                {metrics?.leadsCount ?? 0}
               </span>
               <span className="text-[10px] text-emerald-400 block mt-0.5 font-semibold">
-                {metrics?.leadRate || 62}% conversion
+                {metrics?.leadRate ?? 0}% conversion
               </span>
             </div>
 
             <div className="bg-navy-900/80 p-3 rounded-2xl border border-slate-800">
               <span className="text-[11px] text-slate-400 block font-medium">Appointments</span>
               <span className="text-xl font-extrabold text-emerald-400 mt-0.5 block">
-                {metrics?.appointmentsBooked || 14}
+                {metrics?.appointmentsBooked ?? 0}
               </span>
               <span className="text-[10px] text-slate-400 block mt-0.5">Calendar Synced</span>
             </div>
@@ -257,36 +265,36 @@ export const DashboardPage = () => {
         {[
           {
             label: 'Total Calls',
-            value: metrics?.totalCalls || 48,
-            subtext: '+12% from last week',
+            value: metrics?.totalCalls ?? 0,
+            subtext: 'Across all channels',
             icon: PhoneCall,
             color: 'cyan',
           },
           {
             label: 'Answered Calls',
-            value: metrics?.answeredCalls || 45,
-            subtext: `${metrics?.aiResolutionRate || 94}% AI Resolution`,
+            value: metrics?.answeredCalls ?? 0,
+            subtext: `${metrics?.aiResolutionRate ?? 0}% AI Resolution`,
             icon: CheckCircle2,
             color: 'emerald',
           },
           {
             label: 'Leads Captured',
-            value: metrics?.leadsCount || 29,
+            value: metrics?.leadsCount ?? 0,
             subtext: 'Auto CRM synced',
             icon: Users,
             color: 'indigo',
           },
           {
             label: 'Qualified Leads',
-            value: metrics?.qualifiedLeads || 22,
-            subtext: 'Avg AI score: 92/100',
+            value: metrics?.qualifiedLeads ?? 0,
+            subtext: `Avg AI score: ${metrics?.avgScore ?? 0}/100`,
             icon: Target,
             color: 'amber',
           },
           {
             label: 'Appointments',
-            value: metrics?.appointmentsBooked || 14,
-            subtext: `${metrics?.bookingRate || 29}% booking rate`,
+            value: metrics?.appointmentsBooked ?? 0,
+            subtext: `${metrics?.bookingRate ?? 0}% booking rate`,
             icon: Calendar,
             color: 'emerald',
           },

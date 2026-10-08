@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Send,
   Plus,
@@ -21,62 +21,11 @@ import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
+import api from '../../api/client';
 
 export const CampaignsPage = () => {
-  const [campaigns, setCampaigns] = useState([
-    {
-      id: 'cmp-1',
-      name: 'Weekend Inbound Reception Priority',
-      type: 'inbound_reception',
-      status: 'active',
-      targetAudience: 'All weekend inbound callers across regional markets',
-      totalContacts: 142,
-      successfulCalls: 139,
-      hours: 'Sat - Sun: 08:00 AM - 08:00 PM',
-      retries: 'Instant auto-answer on Ring 1',
-      assignedAgent: 'Sarah (AI Receptionist)',
-      contacts: [
-        { name: 'Marcus Sterling', phone: '+1 (555) 342-9901', status: 'Completed', outcome: 'Booked Appointment', time: 'Today, 11:24 AM' },
-        { name: 'Elena Rostova', phone: '+1 (555) 891-2345', status: 'Completed', outcome: 'Qualified Lead', time: 'Today, 10:15 AM' },
-        { name: 'David Kim', phone: '+1 (555) 772-4321', status: 'Transferred', outcome: 'Transferred to Broker', time: 'Yesterday, 04:45 PM' },
-        { name: 'Jessica Vance', phone: '+1 (555) 234-5678', status: 'Completed', outcome: 'General Inquiry Resolved', time: 'Yesterday, 02:10 PM' },
-      ],
-    },
-    {
-      id: 'cmp-2',
-      name: 'Unqualified Lead Reactivation',
-      type: 'outbound_qualification',
-      status: 'active',
-      targetAudience: 'Leads from past 30 days without scheduled appointments',
-      totalContacts: 45,
-      successfulCalls: 38,
-      hours: 'Mon - Fri: 10:00 AM - 05:00 PM',
-      retries: 'Max 2 callbacks per contact',
-      assignedAgent: 'Sarah (AI Receptionist)',
-      contacts: [
-        { name: 'Jonathan Hayes', phone: '+1 (555) 601-2299', status: 'Completed', outcome: 'Discovery Call Scheduled', time: 'Today, 09:30 AM' },
-        { name: 'Sophia Lorenza', phone: '+1 (555) 438-1122', status: 'Completed', outcome: 'Qualified Lead', time: 'Sep 26, 03:15 PM' },
-        { name: 'Robert Chen', phone: '+1 (555) 912-3344', status: 'Missed', outcome: 'Left AI Voicemail', time: 'Sep 25, 11:00 AM' },
-      ],
-    },
-    {
-      id: 'cmp-3',
-      name: 'Appointment Day-Before Reminder',
-      type: 'appointment_reminder',
-      status: 'paused',
-      targetAudience: 'Patients and clients with consultations scheduled tomorrow',
-      totalContacts: 28,
-      successfulCalls: 28,
-      hours: 'Daily at 05:00 PM',
-      retries: '1 retry after 30 minutes',
-      assignedAgent: 'Sarah (AI Receptionist)',
-      contacts: [
-        { name: 'Emily Watson', phone: '+1 (555) 723-9081', status: 'Completed', outcome: 'Slot Confirmed', time: 'Sep 26, 05:01 PM' },
-        { name: 'Michael Adams', phone: '+1 (555) 654-3210', status: 'Completed', outcome: 'Rescheduled via Call', time: 'Sep 25, 05:02 PM' },
-      ],
-    },
-  ]);
-
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -89,41 +38,68 @@ export const CampaignsPage = () => {
 
   const toast = useToast();
 
-  const handleToggle = (id) => {
-    setCampaigns((prev) =>
-      prev.map((c) =>
-        c.id === id ? { ...c, status: c.status === 'active' ? 'paused' : 'active' } : c
-      )
-    );
-    if (selectedCampaign && selectedCampaign.id === id) {
-      setSelectedCampaign((prev) => ({
-        ...prev,
-        status: prev.status === 'active' ? 'paused' : 'active',
-      }));
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
+  const fetchCampaigns = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/campaigns');
+      if (res?.data) {
+        setCampaigns(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load campaigns:', err);
+    } finally {
+      setLoading(false);
     }
-    toast.info('Campaign status toggled');
   };
 
-  const handleCreate = (e) => {
+  const handleToggle = async (id) => {
+    const camp = campaigns.find((c) => (c._id || c.id) === id);
+    if (!camp) return;
+    const nextStatus = camp.status === 'active' ? 'paused' : 'active';
+    try {
+      await api.put(`/campaigns/${id}`, { status: nextStatus });
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          (c._id || c.id) === id ? { ...c, status: nextStatus } : c
+        )
+      );
+      if (selectedCampaign && (selectedCampaign._id || selectedCampaign.id) === id) {
+        setSelectedCampaign((prev) => ({
+          ...prev,
+          status: nextStatus,
+        }));
+      }
+      toast.info(`Campaign status updated to ${nextStatus}`);
+    } catch (err) {
+      toast.error('Failed to update campaign status');
+    }
+  };
+
+  const handleCreate = async (e) => {
     e.preventDefault();
     if (!newCampaign.name) return;
-    const newCampObj = {
-      id: 'cmp-' + Date.now(),
-      name: newCampaign.name,
-      type: newCampaign.type,
-      status: 'active',
-      targetAudience: newCampaign.targetAudience || 'Target audience segment',
-      totalContacts: 0,
-      successfulCalls: 0,
-      hours: 'Mon - Sun: 24/7 Priority',
-      retries: '1 automated retry',
-      assignedAgent: 'Sarah (AI Receptionist)',
-      contacts: [],
-    };
-    setCampaigns([...campaigns, newCampObj]);
-    toast.success('Campaign created and activated!');
-    setCreateModalOpen(false);
-    setNewCampaign({ name: '', type: 'inbound_reception', targetAudience: '' });
+    try {
+      const res = await api.post('/campaigns', {
+        name: newCampaign.name,
+        type: newCampaign.type,
+        targetAudience: newCampaign.targetAudience || 'All inbound callers',
+        hours: 'Mon - Sun: 24/7 Priority',
+        retries: 'Instant auto-answer',
+        assignedAgent: 'Sarah (AI Receptionist)',
+      });
+      if (res?.data) {
+        setCampaigns((prev) => [res.data, ...prev]);
+        toast.success('Campaign created and activated!');
+      }
+      setCreateModalOpen(false);
+      setNewCampaign({ name: '', type: 'inbound_reception', targetAudience: '' });
+    } catch (err) {
+      toast.error('Failed to create campaign');
+    }
   };
 
   const openDetail = (camp) => {
@@ -149,62 +125,83 @@ export const CampaignsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {campaigns.map((camp) => (
-          <Card key={camp.id} className="p-6 flex flex-col justify-between" hover>
-            <div>
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-brand-cyan flex items-center justify-center shrink-0">
-                    <Send className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-white leading-snug">{camp.name}</h3>
-                    <span className="text-[11px] text-slate-400 capitalize">{camp.type.replace('_', ' ')}</span>
-                  </div>
-                </div>
-                <Badge variant={camp.status === 'active' ? 'emerald' : 'default'} size="xs">
-                  {camp.status}
-                </Badge>
-              </div>
-
-              <p className="text-xs text-slate-400 mt-2 line-clamp-2">
-                Audience: <strong className="text-slate-300">{camp.targetAudience}</strong>
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800 text-xs">
+        {loading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i} className="p-6 h-52 animate-pulse bg-slate-900/40">
+              <div className="h-4 w-1/2 bg-slate-800 rounded mb-3" />
+              <div className="h-3 w-1/3 bg-slate-800 rounded mb-6" />
+              <div className="h-10 bg-slate-800/60 rounded" />
+            </Card>
+          ))
+        ) : campaigns.length === 0 ? (
+          <div className="col-span-full py-16 text-center text-slate-500 text-xs">
+            <Send className="w-10 h-10 mx-auto mb-2 opacity-40 text-brand-cyan" />
+            <p className="font-semibold text-gray-300 text-sm">No campaigns scheduled yet</p>
+            <p className="text-gray-500 mt-1">
+              Configure automated inbound reception rules, callback queues, or outbound follow-up workflows.
+            </p>
+          </div>
+        ) : (
+          campaigns.map((camp) => {
+            const campId = camp._id || camp.id;
+            return (
+              <Card key={campId} className="p-6 flex flex-col justify-between" hover>
                 <div>
-                  <span className="text-slate-400 block text-[10px]">Calls Handled</span>
-                  <span className="font-extrabold text-white text-base font-mono">
-                    {camp.totalContacts}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Completed</span>
-                  <span className="font-extrabold text-emerald-400 text-base font-mono">
-                    {camp.successfulCalls}
-                  </span>
-                </div>
-              </div>
-            </div>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-brand-cyan flex items-center justify-center shrink-0">
+                        <Send className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white leading-snug">{camp.name}</h3>
+                        <span className="text-[11px] text-slate-400 capitalize">{(camp.type || 'inbound_reception').replace('_', ' ')}</span>
+                      </div>
+                    </div>
+                    <Badge variant={camp.status === 'active' ? 'emerald' : 'default'} size="xs">
+                      {camp.status}
+                    </Badge>
+                  </div>
 
-            <div className="mt-6 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-              <button
-                onClick={() => handleToggle(camp.id)}
-                className="text-xs font-semibold text-brand-cyan hover:underline flex items-center gap-1"
-              >
-                {camp.status === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                {camp.status === 'active' ? 'Pause' : 'Resume'}
-              </button>
+                  <p className="text-xs text-slate-400 mt-2 line-clamp-2">
+                    Audience: <strong className="text-slate-300">{camp.targetAudience}</strong>
+                  </p>
 
-              <button
-                onClick={() => openDetail(camp)}
-                className="px-3 py-1.5 rounded-xl bg-navy-800 hover:bg-navy-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
-              >
-                View Details
-              </button>
-            </div>
-          </Card>
-        ))}
+                  <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Calls Handled</span>
+                      <span className="font-extrabold text-white text-base font-mono">
+                        {camp.totalContacts || camp.callsHandled || 0}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Completed</span>
+                      <span className="font-extrabold text-emerald-400 text-base font-mono">
+                        {camp.successfulCalls || camp.completed || 0}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => handleToggle(campId)}
+                    className="text-xs font-semibold text-brand-cyan hover:underline flex items-center gap-1"
+                  >
+                    {camp.status === 'active' ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                    {camp.status === 'active' ? 'Pause' : 'Resume'}
+                  </button>
+
+                  <button
+                    onClick={() => openDetail(camp)}
+                    className="px-3 py-1.5 rounded-xl bg-navy-800 hover:bg-navy-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+                  >
+                    View Details
+                  </button>
+                </div>
+              </Card>
+            );
+          })
+        )}
       </div>
 
       {/* CAMPAIGN DETAIL MODAL (Master Plan Requirement) */}

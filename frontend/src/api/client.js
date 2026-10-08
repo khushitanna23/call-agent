@@ -96,7 +96,7 @@ function resolveOfflineFallback(config) {
       name: 'Vedanco Demo',
       plan: 'growth',
       minutesAllowance: 1000,
-      minutesUsed: 142,
+      minutesUsed: 0,
     };
     return {
       success: true,
@@ -454,72 +454,34 @@ function resolveOfflineFallback(config) {
     }
     try {
       const stored = JSON.parse(localStorage.getItem('vedanco_custom_appts') || '[]');
-      const combined = [...stored, ...MOCK_APPOINTMENTS];
-      const upcoming = combined.filter((a) => a.status === 'scheduled' || a.status === 'confirmed');
+      const upcoming = stored.filter((a) => a.status === 'scheduled' || a.status === 'confirmed');
       return {
         success: true,
-        data: combined,
+        data: stored,
         counts: {
-          total: combined.length,
+          total: stored.length,
           upcoming: upcoming.length,
-          past: combined.filter((a) => a.status === 'completed').length,
-          cancelled: combined.filter((a) => a.status === 'cancelled').length,
+          past: stored.filter((a) => a.status === 'completed').length,
+          cancelled: stored.filter((a) => a.status === 'cancelled').length,
         },
-        total: combined.length,
+        total: stored.length,
       };
     } catch (e) {
-      return { success: true, data: MOCK_APPOINTMENTS, total: MOCK_APPOINTMENTS.length };
+      return { success: true, data: [], total: 0 };
     }
   }
 
   // 11. Knowledge
   if (pathOnly.startsWith('/knowledge')) {
     const storageKey = 'vedanco_knowledge_documents';
-    const defaultDocuments = [
-      {
-        _id: 'knowledge_demo_faq',
-        agentId: 'agent_sarah_1',
-        type: 'faq',
-        title: 'How do I schedule an appointment?',
-        content: 'Sarah can schedule a 15, 30, or 45-minute discovery consultation during the call. Clients receive an SMS and calendar invitation immediately.',
-        source: 'seed_knowledge',
-        status: 'ready',
-        chunksCount: 1,
-        createdAt: '2026-01-12T10:00:00.000Z',
-        updatedAt: '2026-01-12T10:00:00.000Z',
-      },
-      {
-        _id: 'knowledge_demo_pricing',
-        agentId: 'agent_sarah_1',
-        type: 'pricing',
-        title: 'Service Plans & Minute Packages',
-        content: 'Starter is $99 per month for 300 minutes. Growth is $249 per month for 1,000 minutes and CRM integrations. Business is $599 per month for 3,000 minutes and custom voice cloning.',
-        source: 'seed_knowledge',
-        status: 'ready',
-        chunksCount: 1,
-        createdAt: '2026-01-10T10:00:00.000Z',
-        updatedAt: '2026-01-10T10:00:00.000Z',
-      },
-      {
-        _id: 'knowledge_demo_policy',
-        agentId: 'agent_sarah_1',
-        type: 'policy',
-        title: 'Appointment Booking & Cancellation Policy',
-        content: 'Cancellations or rescheduling require at least 2 hours advance notice. Clients can request a new time by phone or through the calendar invitation.',
-        source: 'seed_knowledge',
-        status: 'ready',
-        chunksCount: 1,
-        createdAt: '2026-01-08T10:00:00.000Z',
-        updatedAt: '2026-01-08T10:00:00.000Z',
-      },
-    ];
+    const defaultDocuments = [];
 
     const readDocuments = () => {
       try {
         const stored = JSON.parse(localStorage.getItem(storageKey) || 'null');
         if (Array.isArray(stored)) return stored;
       } catch {
-        // Restore the demo repository when local data is malformed.
+        // Fallback when local data is malformed.
       }
       localStorage.setItem(storageKey, JSON.stringify(defaultDocuments));
       return defaultDocuments;
@@ -611,7 +573,7 @@ function resolveOfflineFallback(config) {
       success: true,
       plan: 'growth',
       minutesAllowance: 1000,
-      minutesUsed: 142,
+      minutesUsed: 0,
       invoices: [],
     };
   }
@@ -640,9 +602,35 @@ function resolveOfflineFallback(config) {
 
   // 15. Admin
   if (pathOnly.startsWith('/admin')) {
+    if (pathOnly.includes('/appointments')) {
+      return { success: true, count: 0, data: [] };
+    }
+    if (pathOnly.includes('/metrics')) {
+      return {
+        success: true,
+        data: {
+          mrr: 0,
+          customers: 0,
+          activeSubscriptions: 0,
+          calls: 0,
+          minutes: 0,
+          aiCost: 0,
+          revenue: 0,
+          grossMargin: 100,
+          churn: '0.0%',
+        },
+      };
+    }
+    if (pathOnly.includes('/clients') || pathOnly.includes('/customers') || pathOnly.includes('/agents') || pathOnly.includes('/calls') || pathOnly.includes('/leads')) {
+      return { success: true, data: [] };
+    }
+    if (pathOnly.includes('/error-logs')) {
+      return { success: true, count: 0, data: [] };
+    }
     return {
       success: true,
-      stats: { totalTenants: 12, totalCalls: 1280, activeAgents: 14, mrr: 12450 },
+      stats: { totalTenants: 0, totalCalls: 0, activeAgents: 0, mrr: 0 },
+      data: [],
     };
   }
 

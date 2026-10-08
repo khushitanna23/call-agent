@@ -19,7 +19,7 @@ const DEFAULT_ACCOUNTS = [
       name: 'Vedanco Demo',
       plan: 'growth',
       minutesAllowance: 1000,
-      minutesUsed: 142,
+      minutesUsed: 0,
       phoneNumbers: [
         {
           number: '+1 (800) 555-0199',
@@ -35,7 +35,7 @@ const DEFAULT_ACCOUNTS = [
     _id: 'usr_admin_1',
     name: 'Super Admin',
     email: 'admin@vedanco.ai',
-    password: 'adminpassword123',
+    password: 'password123',
     role: 'admin',
     organizationId: 'org_demo_1',
     organization: {
@@ -44,7 +44,7 @@ const DEFAULT_ACCOUNTS = [
       name: 'Vedanco Demo',
       plan: 'growth',
       minutesAllowance: 1000,
-      minutesUsed: 142,
+      minutesUsed: 0,
       phoneNumbers: [
         {
           number: '+1 (800) 555-0199',
@@ -202,7 +202,7 @@ export const loginLocalUser = (email, password) => {
     name: `${user.name}'s Company`,
     plan: 'growth',
     minutesAllowance: 1000,
-    minutesUsed: 142,
+    minutesUsed: 0,
     phoneNumbers: [
       {
         number: '+1 (800) 555-0199',
@@ -229,6 +229,7 @@ export const loginLocalUser = (email, password) => {
   return {
     success: true,
     token,
+    role: user.role === 'admin' ? 'admin' : 'client',
     user: {
       id: user.id || user._id,
       _id: user.id || user._id,
@@ -255,8 +256,8 @@ export const MOCK_AGENT = {
   phoneNumber: '+1 (800) 555-0199',
   status: 'ONLINE',
   greetingMessage: 'Hello! Thank you for calling VEDANCO AI. My name is Sarah, your AI Receptionist. How may I assist you today?',
-  totalCallsCount: 24,
-  totalMinutesUsed: 142,
+  totalCallsCount: 0,
+  totalMinutesUsed: 0,
   personality: 'Warm, articulate, highly attentive, and proactive.',
   actions: {
     answerCalls: true,
@@ -268,151 +269,25 @@ export const MOCK_AGENT = {
   },
 };
 
-export const MOCK_CALLS = [
-  {
-    _id: 'call_1',
-    callerName: 'Jessica Vance',
-    callerNumber: '+1 (555) 382-9011',
-    status: 'completed',
-    direction: 'inbound',
-    durationSeconds: 145,
-    intent: 'AI Receptionist for Real Estate Team',
-    aiScore: 94,
-    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    summary: 'Caller inquired about 24/7 coverage for a 5-broker office. Lead qualified and calendar booking sent.',
-  },
-  {
-    _id: 'call_2',
-    callerName: 'Dr. Michael Chen',
-    callerNumber: '+1 (555) 912-4433',
-    status: 'completed',
-    direction: 'inbound',
-    durationSeconds: 210,
-    intent: 'Patient Intake & Appointment Booking',
-    aiScore: 98,
-    createdAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(),
-    summary: 'Scheduled consultation for tomorrow morning. Sent confirmation SMS to patient.',
-  },
-  {
-    _id: 'call_3',
-    callerName: 'Robert Miller',
-    callerNumber: '+1 (555) 472-8819',
-    status: 'answered',
-    direction: 'inbound',
-    durationSeconds: 98,
-    intent: 'Test Drive Scheduling & Service Hours',
-    aiScore: 82,
-    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    summary: 'Caller verified Saturday service hours and requested callback from service manager.',
-  },
-  {
-    _id: 'call_4',
-    callerName: 'Elena Rostova',
-    callerNumber: '+1 (555) 604-1290',
-    status: 'transferred',
-    direction: 'inbound',
-    durationSeconds: 312,
-    intent: 'Hotel Concierge & Group Booking',
-    aiScore: 91,
-    createdAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    summary: 'Group reservation query for 20 guests. Transferred to VIP reservations desk.',
-  },
-];
+export const MOCK_CALLS = [];
 
-export const MOCK_LEADS = [
-  {
-    _id: 'lead_1',
-    name: 'Jessica Vance',
-    phone: '+1 (555) 382-9011',
-    email: 'jessica@vanceproperties.com',
-    company: 'Vance Real Estate Group',
-    pipelineStage: 'QUALIFIED',
-    aiScore: 94,
-    intent: 'AI Receptionist for 5 Agent Team',
-    createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-  },
-  {
-    _id: 'lead_2',
-    name: 'Dr. Michael Chen',
-    phone: '+1 (555) 912-4433',
-    email: 'chen@summitwellness.org',
-    company: 'Summit Wellness Clinic',
-    pipelineStage: 'APPOINTMENT',
-    aiScore: 98,
-    intent: 'Patient Intake & Booking',
-    createdAt: new Date(Date.now() - 1000 * 60 * 70).toISOString(),
-  },
-  {
-    _id: 'lead_3',
-    name: 'Robert Miller',
-    phone: '+1 (555) 472-8819',
-    email: 'robert@millermotors.com',
-    company: 'Miller Auto Dealership',
-    pipelineStage: 'CONTACTED',
-    aiScore: 82,
-    intent: 'Test Drive Scheduling',
-    createdAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-  },
-  {
-    _id: 'lead_4',
-    name: 'Elena Rostova',
-    phone: '+1 (555) 604-1290',
-    email: 'elena@grandvistahotel.com',
-    company: 'Grand Vista Resort & Spa',
-    pipelineStage: 'PROPOSAL',
-    aiScore: 91,
-    intent: 'Hotel Concierge & Reservations',
-    createdAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-  },
-];
+export const MOCK_LEADS = [];
 
-export const MOCK_APPOINTMENTS = [
-  {
-    _id: 'appt_1',
-    bookingReference: 'VED-MC1092',
-    customerName: 'Dr. Michael Chen',
-    customerPhone: '+1 (555) 912-4433',
-    customerEmail: 'mchen@example.com',
-    date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    timeSlot: '10:30 AM',
-    type: 'Discovery Call',
-    status: 'scheduled',
-    notes: 'Initial consultation and strategy session.',
-    durationMinutes: 30,
-  },
-  {
-    _id: 'appt_2',
-    bookingReference: 'VED-JV4819',
-    customerName: 'Jessica Vance',
-    customerPhone: '+1 (555) 382-9011',
-    customerEmail: 'jvance@example.com',
-    date: new Date(Date.now() + 172800000).toISOString().split('T')[0],
-    timeSlot: '02:00 PM',
-    type: 'Product Demo',
-    status: 'scheduled',
-    notes: 'Platform onboarding & enterprise demo.',
-    durationMinutes: 45,
-  },
-];
+export const MOCK_APPOINTMENTS = [];
 
 export const MOCK_ANALYTICS = {
   metrics: {
-    totalCalls: 38,
-    answeredCalls: 36,
-    missedCalls: 2,
-    totalMinutes: 142,
-    leadsCount: 29,
-    leadRate: 62,
-    appointmentsBooked: 14,
-    avgScore: 88,
+    totalCalls: 0,
+    answeredCalls: 0,
+    missedCalls: 0,
+    totalMinutes: 0,
+    leadsCount: 0,
+    leadRate: 0,
+    appointmentsBooked: 0,
+    avgScore: 0,
   },
   charts: {
-    activityChart: [
-      { date: 'Mon', calls: 5, leads: 3, appointments: 1 },
-      { date: 'Tue', calls: 8, leads: 6, appointments: 3 },
-      { date: 'Wed', calls: 7, leads: 5, appointments: 2 },
-      { date: 'Thu', calls: 10, leads: 8, appointments: 4 },
-      { date: 'Fri', calls: 8, leads: 7, appointments: 4 },
-    ],
+    activityChart: [],
   },
 };
+

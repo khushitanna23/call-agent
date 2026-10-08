@@ -410,6 +410,38 @@ exports.bookPublicAppointment = async (req, res, next) => {
       `[Appointment Created] Reference: ${bookingReference} | Date: ${date} ${timeSlot} | Customer: ${customerName} | Phone: ${customerPhone}`
     );
 
+    // Real-Time Socket.io Broadcast to Super Admin and Client Workspace
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        const payload = {
+          appointment: {
+            ...appointment.toObject(),
+            organizationId: {
+              _id: organization._id,
+              name: organization.name,
+              ownerId: organization.ownerId,
+            },
+            agentId: {
+              _id: agent._id,
+              name: agent.name,
+            },
+          },
+          organization: {
+            _id: organization._id,
+            name: organization.name,
+          },
+        };
+        io.to('admin_global').emit('admin_appointment_booked', payload);
+        io.emit('appointment_booked', payload);
+        if (organization._id) {
+          io.to(`org_${organization._id}`).emit('new_appointment', payload.appointment);
+        }
+      }
+    } catch (socketErr) {
+      console.warn('[Socket Notification Note]', socketErr.message);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Appointment successfully scheduled and synchronized with Google Calendar!',
@@ -719,8 +751,7 @@ exports.downloadIcs = async (req, res, next) => {
 exports.getAppointments = async (req, res, next) => {
   try {
     const { status, date, search } = req.query;
-    const directCount = await Appointment.countDocuments({ organizationId: req.organizationId });
-    const query = directCount > 0 ? { organizationId: req.organizationId } : {};
+    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
 
     if (status && status !== 'all') {
       query.status = status;
@@ -901,6 +932,40 @@ exports.createAppointment = async (req, res, next) => {
       console.warn('[Appointment] Lead sync note:', leadErr.message);
     }
 
+    // Real-Time Socket.io Broadcast to Super Admin and Client Workspace
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        const Organization = require('../models/Organization');
+        const org = await Organization.findById(req.organizationId);
+        const payload = {
+          appointment: {
+            ...appointment.toObject(),
+            organizationId: org ? {
+              _id: org._id,
+              name: org.name,
+              ownerId: org.ownerId,
+            } : null,
+            agentId: {
+              _id: agent._id,
+              name: agent.name,
+            },
+          },
+          organization: org ? {
+            _id: org._id,
+            name: org.name,
+          } : { name: 'Client Workspace' },
+        };
+        io.to('admin_global').emit('admin_appointment_booked', payload);
+        io.emit('appointment_booked', payload);
+        if (req.organizationId) {
+          io.to(`org_${req.organizationId}`).emit('new_appointment', payload.appointment);
+        }
+      }
+    } catch (socketErr) {
+      console.warn('[Socket Notification Note]', socketErr.message);
+    }
+
     res.status(201).json({
       success: true,
       message: 'Appointment scheduled and synchronized with Google Calendar!',
@@ -918,15 +983,30 @@ exports.createAppointment = async (req, res, next) => {
  */
 exports.updateAppointment = async (req, res, next) => {
   try {
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
     const appointment = await Appointment.findOneAndUpdate(
-      { _id: req.params.id, organizationId: req.organizationId },
+      query,
       req.body,
       { new: true }
-    );
+    )
+      .populate('organizationId', 'name slug ownerId')
+      .populate('agentId', 'name type voice');
 
     if (!appointment) {
       return res.status(404).json({ success: false, message: 'Appointment not found' });
     }
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_appointment_updated', { appointment });
+        io.emit('appointment_updated', { appointment });
+        const orgId = appointment.organizationId?._id || appointment.organizationId;
+        if (orgId) {
+          io.to(`org_${orgId}`).emit('appointment_updated', appointment);
+        }
+      }
+    } catch (e) {}
 
     res.json({ success: true, message: 'Appointment updated', data: appointment });
   } catch (error) {
@@ -941,15 +1021,30 @@ exports.updateAppointment = async (req, res, next) => {
  */
 exports.cancelAppointment = async (req, res, next) => {
   try {
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
     const appointment = await Appointment.findOneAndUpdate(
-      { _id: req.params.id, organizationId: req.organizationId },
+      query,
       { status: 'cancelled', cancelledAt: new Date() },
       { new: true }
-    );
+    )
+      .populate('organizationId', 'name slug ownerId')
+      .populate('agentId', 'name type voice');
 
     if (!appointment) {
       return res.status(404).json({ success: false, message: 'Appointment not found' });
     }
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_appointment_updated', { appointment });
+        io.emit('appointment_updated', { appointment });
+        const orgId = appointment.organizationId?._id || appointment.organizationId;
+        if (orgId) {
+          io.to(`org_${orgId}`).emit('appointment_updated', appointment);
+        }
+      }
+    } catch (e) {}
 
     res.json({ success: true, message: 'Appointment cancelled', data: appointment });
   } catch (error) {

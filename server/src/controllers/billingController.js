@@ -18,35 +18,12 @@ exports.getBillingInfo = async (req, res, next) => {
     const currentPlanId = org.plan || 'growth';
     const planDetails = PLANS.find((p) => p.id === currentPlanId) || PLANS[1];
 
-    const minutesUsed = org.minutesUsed || 142;
+    const minutesUsed = org.minutesUsed || 0;
     const minutesAllowance = org.minutesAllowance || planDetails.minutes;
     const minutesRemaining = Math.max(0, minutesAllowance - minutesUsed);
-    const usagePercent = Math.min(100, Math.round((minutesUsed / minutesAllowance) * 100));
+    const usagePercent = minutesAllowance > 0 ? Math.min(100, Math.round((minutesUsed / minutesAllowance) * 100)) : 0;
 
-    // Fallback demo invoices if none in DB
-    const displayInvoices =
-      invoices.length > 0
-        ? invoices
-        : [
-            {
-              invoiceNumber: 'INV-2026-003',
-              amount: planDetails.price,
-              currency: 'USD',
-              status: 'paid',
-              paidAt: new Date(Date.now() - 5 * 86400000),
-              description: `${planDetails.name} Plan Monthly Subscription`,
-              pdfUrl: '#',
-            },
-            {
-              invoiceNumber: 'INV-2026-002',
-              amount: planDetails.price,
-              currency: 'USD',
-              status: 'paid',
-              paidAt: new Date(Date.now() - 35 * 86400000),
-              description: `${planDetails.name} Plan Monthly Subscription`,
-              pdfUrl: '#',
-            },
-          ];
+    const displayInvoices = invoices;
 
     res.json({
       success: true,

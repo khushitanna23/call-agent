@@ -61,55 +61,43 @@ export const AnalyticsPage = () => {
   const OUTCOME_COLORS = ['#10b981', '#06b6d4', '#6366f1', '#f59e0b', '#f43f5e'];
 
   const metrics = data?.metrics || {
-    totalCalls: 48,
-    answeredCalls: 45,
-    missedCalls: 3,
-    averageDurationSeconds: 118,
-    leadsCount: 29,
-    qualifiedLeads: 22,
-    appointmentsBooked: 14,
-    transfersCount: 3,
-    aiResolutionRate: 94,
-    bookingRate: 29,
-    leadRate: 60,
-    transferRate: 6,
-    averageCallCost: 0.18,
-    totalCost: 8.64,
+    totalCalls: 0,
+    answeredCalls: 0,
+    missedCalls: 0,
+    averageDurationSeconds: 0,
+    leadsCount: 0,
+    qualifiedLeads: 0,
+    appointmentsBooked: 0,
+    transfersCount: 0,
+    aiResolutionRate: 0,
+    bookingRate: 0,
+    leadRate: 0,
+    transferRate: 0,
+    averageCallCost: 0,
+    totalCost: 0,
   };
 
-  const activityChart = data?.charts?.activityChart || [
-    { time: 'Sep 01', calls: 8, leads: 5 },
-    { time: 'Sep 05', calls: 12, leads: 7 },
-    { time: 'Sep 10', calls: 15, leads: 9 },
-    { time: 'Sep 15', calls: 10, leads: 6 },
-    { time: 'Sep 20', calls: 18, leads: 11 },
-    { time: 'Sep 25', calls: 22, leads: 14 },
-    { time: 'Sep 28', calls: 16, leads: 10 },
-  ];
+  const activityChart = data?.charts?.activityChart || [];
 
-  const intentData = data?.charts?.intentData || [
-    { name: 'Service Inquiry', value: 45 },
-    { name: 'Appointment Booking', value: 28 },
-    { name: 'Pricing Questions', value: 18 },
-    { name: 'Human Support', value: 9 },
-  ];
+  const intentData = data?.charts?.intentData || [];
 
-  // Master Plan Chart 3: Appointments over time
+  // Appointments over time derived dynamically
   const appointmentChart = [
-    { period: 'Week 1', booked: 3, completed: 3 },
-    { period: 'Week 2', booked: 5, completed: 4 },
-    { period: 'Week 3', booked: 4, completed: 4 },
-    { period: 'Week 4', booked: 6, completed: 5 },
+    { period: 'Week 1', booked: 0, completed: 0 },
+    { period: 'Week 2', booked: 0, completed: 0 },
+    { period: 'Week 3', booked: 0, completed: 0 },
+    { period: 'Current', booked: metrics.appointmentsBooked, completed: metrics.appointmentsBooked },
   ];
 
-  // Master Plan Chart 4: Call Outcomes and disposition
-  const outcomeData = [
-    { name: 'Resolved by AI', value: 28 },
-    { name: 'Qualified CRM Lead', value: 22 },
-    { name: 'Appointment Booked', value: 14 },
-    { name: 'Transferred to Human', value: 3 },
-    { name: 'Missed Call', value: 3 },
+  // Call Outcomes and disposition derived dynamically from actual metrics
+  const rawOutcomes = [
+    { name: 'Answered by AI', value: metrics.answeredCalls },
+    { name: 'Qualified CRM Leads', value: metrics.qualifiedLeads },
+    { name: 'Appointments Booked', value: metrics.appointmentsBooked },
+    { name: 'Transferred Calls', value: metrics.transfersCount },
+    { name: 'Missed / Dropped', value: metrics.missedCalls },
   ];
+  const outcomeData = rawOutcomes.filter((o) => o.value > 0);
 
   return (
     <div className="space-y-8 animate-in fade-in">
@@ -251,48 +239,58 @@ export const AnalyticsPage = () => {
               title="Caller Intent Breakdown"
               subtitle="Classified automatically by AI during dialogue"
             />
-            <div className="h-56 w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={intentData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {intentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#334155',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="space-y-1.5 pt-2 border-t border-slate-800 text-xs">
-              {intentData.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between text-slate-300">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: COLORS[idx % COLORS.length] }}
-                    />
-                    <span className="truncate max-w-[150px]">{item.name}</span>
-                  </div>
-                  <span className="font-mono font-semibold">{item.value}%</span>
+            {intentData.length === 0 ? (
+              <div className="h-56 w-full flex flex-col items-center justify-center text-slate-500 text-xs">
+                <PieIcon className="w-8 h-8 mb-2 opacity-40 text-cyan-400" />
+                <span>No caller intents recorded yet</span>
+                <span className="text-[11px] text-slate-600 mt-1">Populates automatically as calls arrive</span>
+              </div>
+            ) : (
+              <>
+                <div className="h-56 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={intentData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={75}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {intentData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0f172a',
+                          borderColor: '#334155',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-slate-800 text-xs">
+                  {intentData.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                        />
+                        <span className="truncate max-w-[150px]">{item.name}</span>
+                      </div>
+                      <span className="font-mono font-semibold">{item.value}%</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </Card>
         </div>
       </div>
@@ -341,48 +339,58 @@ export const AnalyticsPage = () => {
               title="Call Outcomes & Disposition"
               subtitle="End result of all front-desk inbound telephone sessions"
             />
-            <div className="h-56 w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={outcomeData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {outcomeData.map((entry, index) => (
-                      <Cell key={`outcome-cell-${index}`} fill={OUTCOME_COLORS[index % OUTCOME_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#0f172a',
-                      borderColor: '#334155',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="space-y-1.5 pt-2 border-t border-slate-800 text-xs">
-              {outcomeData.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between text-slate-300">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: OUTCOME_COLORS[idx % OUTCOME_COLORS.length] }}
-                    />
-                    <span className="truncate max-w-[170px]">{item.name}</span>
-                  </div>
-                  <span className="font-mono font-semibold">{item.value} calls</span>
+            {outcomeData.length === 0 ? (
+              <div className="h-56 w-full flex flex-col items-center justify-center text-slate-500 text-xs">
+                <PieIcon className="w-8 h-8 mb-2 opacity-40 text-emerald-400" />
+                <span>No call outcomes recorded yet</span>
+                <span className="text-[11px] text-slate-600 mt-1">Dispositions appear when calls finish</span>
+              </div>
+            ) : (
+              <>
+                <div className="h-56 w-full flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={outcomeData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={75}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {outcomeData.map((entry, index) => (
+                          <Cell key={`outcome-cell-${index}`} fill={OUTCOME_COLORS[index % OUTCOME_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#0f172a',
+                          borderColor: '#334155',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+
+                <div className="space-y-1.5 pt-2 border-t border-slate-800 text-xs">
+                  {outcomeData.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-slate-300">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: OUTCOME_COLORS[idx % OUTCOME_COLORS.length] }}
+                        />
+                        <span className="truncate max-w-[170px]">{item.name}</span>
+                      </div>
+                      <span className="font-mono font-semibold">{item.value} calls</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </Card>
         </div>
       </div>

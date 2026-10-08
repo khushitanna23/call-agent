@@ -50,12 +50,21 @@ app.use('/api/calls', require('./routes/callRoutes'));
 app.use('/api/leads', require('./routes/leadRoutes'));
 app.use('/api/appointments', require('./routes/appointmentRoutes'));
 app.use('/api/knowledge', require('./routes/knowledgeRoutes'));
+app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/billing', require('./routes/billingRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
+app.use('/api/webhook', require('./routes/webhookRoutes'));
 app.use('/api/webhooks', require('./routes/webhookRoutes'));
 app.use('/api/demo', require('./routes/demoRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+
+// Client Workspace direct route aliases (/api/app/*)
+app.use('/api/app/leads', require('./routes/leadRoutes'));
+app.use('/api/app/appointments', require('./routes/appointmentRoutes'));
+app.use('/api/app/knowledge', require('./routes/knowledgeRoutes'));
+app.use('/api/app/campaigns', require('./routes/campaignRoutes'));
+app.use('/api/app/calls', require('./routes/callRoutes'));
 
 // 404 Route Handler
 app.use((req, res, next) => {
@@ -68,15 +77,44 @@ app.use((req, res, next) => {
 // Centralized error handler
 app.use(errorHandler);
 
+const http = require('http');
+const { Server } = require('socket.io');
 const callSchedulerService = require('./services/callSchedulerService');
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+// Create HTTP Server & Initialize Socket.io
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    credentials: true,
+  },
+});
+
+io.on('connection', (socket) => {
+  // Join organization room for scoped events
+  socket.on('join_org', (orgId) => {
+    if (orgId) {
+      socket.join(`org_${orgId}`);
+    }
+  });
+
+  // Join admin room for super admin global events
+  socket.on('join_admin', () => {
+    socket.join('admin_global');
+  });
+});
+
+app.set('io', io);
+
+server.listen(PORT, () => {
   console.log(`====================================================`);
   console.log(`🚀 VEDANCO AI Backend Server Running on Port ${PORT}`);
   console.log(`📡 Health Check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 Allowed Client URL: ${process.env.CLIENT_URL || 'http://localhost:5173'}`);
+  console.log(`⚡ Socket.io Real-Time Engine Active`);
   console.log(`====================================================`);
 
   // Start automated appointment call scheduler

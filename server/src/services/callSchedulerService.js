@@ -113,6 +113,8 @@ class CallSchedulerService {
             continue;
           }
 
+          this.broadcastUpdate(lockedAppt);
+
           console.log(`[Scheduler] Appointment found: ${lockedAppt.bookingReference} for ${lockedAppt.customerName}`);
           console.log(`[Scheduler] Starting outbound call to ${lockedAppt.customerPhone}`);
 
@@ -176,6 +178,7 @@ class CallSchedulerService {
       appointment.vapiCallId = vapiResult.callId;
       appointment.callStatus = 'calling';
       await appointment.save();
+      this.broadcastUpdate(appointment);
 
       return {
         success: true,
@@ -189,8 +192,24 @@ class CallSchedulerService {
       appointment.callStatus = 'failed';
       appointment.callEndedReason = err.message;
       await appointment.save();
+      this.broadcastUpdate(appointment);
       throw err;
     }
+  }
+
+  broadcastUpdate(appointment) {
+    try {
+      const app = require('../server');
+      const io = app.get('io');
+      if (io && appointment) {
+        io.to('admin_global').emit('admin_appointment_updated', { appointment });
+        io.emit('appointment_updated', { appointment });
+        const orgId = appointment.organizationId?._id || appointment.organizationId;
+        if (orgId) {
+          io.to(`org_${orgId}`).emit('appointment_updated', appointment);
+        }
+      }
+    } catch (e) {}
   }
 }
 

@@ -14,7 +14,7 @@ exports.getCalls = async (req, res, next) => {
   try {
     const { status, agentId, search, dateRange, limit = 50, page = 1 } = req.query;
 
-    const query = { organizationId: req.organizationId };
+    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
 
     if (status && status !== 'all') {
       query.status = status;
@@ -34,6 +34,7 @@ exports.getCalls = async (req, res, next) => {
     }
 
     const calls = await Call.find(query)
+      .populate('organizationId', 'name slug')
       .populate('agentId', 'name type voice')
       .populate('leadId', 'name email company aiScore pipelineStage')
       .populate('appointmentId', 'date timeSlot status type')
@@ -59,10 +60,9 @@ exports.getCalls = async (req, res, next) => {
 // @access  Private
 exports.getCallById = async (req, res, next) => {
   try {
-    const call = await Call.findOne({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    })
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    const call = await Call.findOne(query)
+      .populate('organizationId', 'name slug')
       .populate('agentId')
       .populate('leadId')
       .populate('appointmentId');
@@ -222,6 +222,35 @@ exports.simulateCall = async (req, res, next) => {
     call.leadId = lead._id;
     call.appointmentId = appointment._id;
     await call.save();
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        const Organization = require('../models/Organization');
+        const org = await Organization.findById(req.organizationId);
+        const payload = {
+          call: {
+            ...call.toObject(),
+            organizationId: org ? { _id: org._id, name: org.name } : null,
+            agentId: { _id: agent._id, name: agent.name },
+          },
+          lead,
+          appointment,
+          organization: org,
+        };
+        io.to('admin_global').emit('admin_call_created', payload);
+        io.emit('call_created', payload);
+        io.to('admin_global').emit('admin_lead_created', { lead });
+        io.emit('lead_created', { lead });
+        io.to('admin_global').emit('admin_appointment_booked', { appointment, organization: org });
+        io.emit('appointment_booked', { appointment, organization: org });
+        if (req.organizationId) {
+          io.to(`org_${req.organizationId}`).emit('call_created', payload.call);
+          io.to(`org_${req.organizationId}`).emit('lead_created', lead);
+          io.to(`org_${req.organizationId}`).emit('new_appointment', appointment);
+        }
+      }
+    } catch (socketErr) {}
 
     res.status(201).json({
       success: true,

@@ -108,7 +108,7 @@ export const AgentsPage = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Total Calls Answered:</span>
-                  <span className="text-emerald-400 font-semibold">{agent.totalCallsCount || 24} calls</span>
+                  <span className="text-emerald-400 font-semibold">{agent.totalCallsCount ?? 0} calls</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Active Actions:</span>

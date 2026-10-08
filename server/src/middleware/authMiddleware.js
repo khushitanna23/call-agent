@@ -35,11 +35,15 @@ const protect = async (req, res, next) => {
       req.user = user;
       req.organizationId = user.organizationId;
 
-      // Tenant switching is allowed only for the authenticated user's own organization
-      // or an active organization membership.
+      // Multi-tenant isolation: clients strictly locked to their org; agency admins can impersonate
       if (req.headers['x-organization-id']) {
         const requestedOrganizationId = req.headers['x-organization-id'];
-        if (String(requestedOrganizationId) !== String(user.organizationId)) {
+        const isAgencyAdmin = user.role === 'admin' || user.role === 'super_admin' || user.role === 'agency_admin';
+        
+        if (isAgencyAdmin) {
+          // Agency admin support impersonation permitted
+          req.organizationId = requestedOrganizationId;
+        } else if (String(requestedOrganizationId) !== String(user.organizationId)) {
           const membership = await OrganizationMember.findOne({
             organizationId: requestedOrganizationId,
             userId: user._id,
@@ -48,11 +52,11 @@ const protect = async (req, res, next) => {
           if (!membership) {
             return res.status(403).json({
               success: false,
-              message: 'You do not have access to this organization',
+              message: 'Cross-tenant access forbidden. You do not belong to this organization.',
             });
           }
+          req.organizationId = requestedOrganizationId;
         }
-        req.organizationId = requestedOrganizationId;
       }
 
       next();

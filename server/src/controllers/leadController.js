@@ -10,7 +10,7 @@ exports.getLeads = async (req, res, next) => {
   try {
     const { stage, search, minScore } = req.query;
 
-    const query = { organizationId: req.organizationId };
+    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
 
     if (stage && stage !== 'all') {
       query.pipelineStage = stage;
@@ -30,6 +30,7 @@ exports.getLeads = async (req, res, next) => {
     }
 
     const leads = await Lead.find(query)
+      .populate('organizationId', 'name slug')
       .populate('lastCallId', 'callId durationSeconds status createdAt')
       .populate('appointmentId', 'date timeSlot status type')
       .sort({ createdAt: -1 });
@@ -67,10 +68,9 @@ exports.getLeads = async (req, res, next) => {
 // @access  Private
 exports.getLeadById = async (req, res, next) => {
   try {
-    const lead = await Lead.findOne({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    })
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    const lead = await Lead.findOne(query)
+      .populate('organizationId', 'name slug')
       .populate('lastCallId')
       .populate('appointmentId');
 
@@ -111,6 +111,17 @@ exports.createLead = async (req, res, next) => {
       performedBy: req.user.name,
     });
 
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_lead_created', { lead });
+        io.emit('lead_created', { lead });
+        if (req.organizationId) {
+          io.to(`org_${req.organizationId}`).emit('lead_created', lead);
+        }
+      }
+    } catch (socketErr) {}
+
     res.status(201).json({ success: true, data: lead });
   } catch (error) {
     next(error);
@@ -122,10 +133,8 @@ exports.createLead = async (req, res, next) => {
 // @access  Private
 exports.updateLead = async (req, res, next) => {
   try {
-    const existing = await Lead.findOne({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    });
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    const existing = await Lead.findOne(query);
 
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Lead not found' });
@@ -137,7 +146,7 @@ exports.updateLead = async (req, res, next) => {
     // If stage changed, record activity
     if (req.body.pipelineStage && req.body.pipelineStage !== prevStage) {
       await LeadActivity.create({
-        organizationId: req.organizationId,
+        organizationId: existing.organizationId,
         leadId: lead._id,
         type: 'stage_change',
         title: 'Stage Changed',
@@ -145,6 +154,17 @@ exports.updateLead = async (req, res, next) => {
         performedBy: req.user.name || 'System',
       });
     }
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_lead_updated', { lead });
+        io.emit('lead_updated', lead);
+        if (existing.organizationId) {
+          io.to(`org_${existing.organizationId}`).emit('lead_updated', lead);
+        }
+      }
+    } catch (socketErr) {}
 
     res.json({ success: true, data: lead });
   } catch (error) {
@@ -178,11 +198,17 @@ exports.addLeadActivity = async (req, res, next) => {
 // @access  Private
 exports.deleteLead = async (req, res, next) => {
   try {
-    await Lead.findOneAndDelete({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    });
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    await Lead.findOneAndDelete(query);
     await LeadActivity.deleteMany({ leadId: req.params.id });
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_lead_deleted', { id: req.params.id });
+        io.emit('lead_deleted', { id: req.params.id });
+      }
+    } catch (socketErr) {}
 
     res.json({ success: true, message: 'Lead deleted successfully' });
   } catch (error) {

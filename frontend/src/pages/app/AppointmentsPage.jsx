@@ -26,6 +26,7 @@ import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/client';
+import { io } from 'socket.io-client';
 
 export const AppointmentsPage = () => {
   const [searchParams] = useSearchParams();
@@ -66,13 +67,33 @@ export const AppointmentsPage = () => {
     fetchAppointments();
     fetchAgents();
 
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+    });
+
+    const orgId = localStorage.getItem('vedanco_org_id');
+    socket.on('connect', () => {
+      if (orgId) socket.emit('join_org', orgId);
+    });
+
+    socket.on('appointment_booked', (payload) => {
+      const name = payload.appointment?.callerName || payload.appointment?.customerName || 'Inbound Caller';
+      const time = payload.appointment?.scheduledTime || payload.appointment?.timeSlot || 'Scheduled';
+      toast.success(`🗓️ New Appointment Booked: ${name} (${time})`);
+      fetchAppointments();
+    });
+
     // Periodic auto-check every 20 seconds so appointments move to Completed in real-time
     const timer = setInterval(() => {
       setClockTicker(Date.now());
       fetchAppointments();
     }, 20000);
 
-    return () => clearInterval(timer);
+    return () => {
+      socket.disconnect();
+      clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -527,7 +548,10 @@ export const AppointmentsPage = () => {
           {filteredAppointments.length === 0 ? (
             <div className="col-span-full py-16 text-center text-slate-500 text-xs">
               <CalendarIcon className="w-10 h-10 mx-auto mb-2 opacity-40 text-brand-cyan" />
-              No appointments found in "{activeTab}" category.
+              <p className="font-semibold text-gray-300 text-sm">No appointments scheduled yet</p>
+              <p className="text-gray-500 mt-1">
+                When callers book a consultation or you schedule one manually, it will appear here in real-time.
+              </p>
             </div>
           ) : (
             filteredAppointments.map((appt) => (

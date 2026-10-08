@@ -49,36 +49,48 @@ exports.getAnalytics = async (req, res, next) => {
     const totalAppointments = appointments.length;
 
     const totalCost = calls.reduce((acc, c) => acc + (c.cost || 0), 0);
-    const avgCostPerCall = totalCalls > 0 ? Number((totalCost / totalCalls).toFixed(2)) : 0.15;
+    const avgCostPerCall = totalCalls > 0 ? Number((totalCost / totalCalls).toFixed(2)) : 0;
 
     // Rates
-    const aiResolutionRate = totalCalls > 0 ? Math.round(((totalCalls - transferredCalls - missedCalls) / totalCalls) * 100) : 94;
-    const bookingRate = totalCalls > 0 ? Math.round((totalAppointments / totalCalls) * 100) : 28;
-    const leadRate = totalCalls > 0 ? Math.round((leads.length / totalCalls) * 100) : 62;
-    const transferRate = totalCalls > 0 ? Math.round((transferredCalls / totalCalls) * 100) : 6;
+    const aiResolutionRate = totalCalls > 0 ? Math.round(((totalCalls - transferredCalls - missedCalls) / totalCalls) * 100) : 0;
+    const bookingRate = totalCalls > 0 ? Math.round((totalAppointments / totalCalls) * 100) : 0;
+    const leadRate = totalCalls > 0 ? Math.round((leads.length / totalCalls) * 100) : 0;
+    const transferRate = totalCalls > 0 ? Math.round((transferredCalls / totalCalls) * 100) : 0;
 
-    // Time-series graph data (Last 7 or 14 points)
+    // Time-series graph data calculated from actual MongoDB documents
     const daysCount = timeRange === 'today' ? 8 : timeRange === '7d' ? 7 : 14;
     const activityChart = [];
 
     for (let i = daysCount - 1; i >= 0; i--) {
-      const d = new Date();
+      const bucketStart = new Date();
+      const bucketEnd = new Date();
+
       if (timeRange === 'today') {
-        d.setHours(d.getHours() - i * 2);
-        const label = `${d.getHours()}:00`;
-        const count = Math.floor(Math.random() * 8) + 2;
-        const ans = Math.max(1, count - Math.floor(Math.random() * 2));
-        activityChart.push({ time: label, calls: count, answered: ans, leads: Math.floor(ans * 0.6) });
+        bucketStart.setHours(bucketStart.getHours() - (i + 1) * 3, 0, 0, 0);
+        bucketEnd.setHours(bucketEnd.getHours() - i * 3, 0, 0, 0);
+        const label = `${bucketStart.getHours()}:00`;
+
+        const bucketCalls = calls.filter((c) => c.createdAt >= bucketStart && c.createdAt < bucketEnd);
+        const bucketLeads = leads.filter((l) => l.createdAt >= bucketStart && l.createdAt < bucketEnd);
+        const ans = bucketCalls.filter((c) => ['answered', 'completed', 'transferred'].includes(c.status)).length;
+
+        activityChart.push({ time: label, calls: bucketCalls.length, answered: ans, leads: bucketLeads.length });
       } else {
-        d.setDate(d.getDate() - i);
-        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const count = Math.floor(Math.random() * 20) + 12;
-        const ans = Math.max(8, count - Math.floor(Math.random() * 3));
-        activityChart.push({ time: label, calls: count, answered: ans, leads: Math.floor(ans * 0.5) });
+        bucketStart.setDate(bucketStart.getDate() - i);
+        bucketStart.setHours(0, 0, 0, 0);
+        bucketEnd.setDate(bucketEnd.getDate() - i);
+        bucketEnd.setHours(23, 59, 59, 999);
+        const label = bucketStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        const bucketCalls = calls.filter((c) => c.createdAt >= bucketStart && c.createdAt <= bucketEnd);
+        const bucketLeads = leads.filter((l) => l.createdAt >= bucketStart && l.createdAt <= bucketEnd);
+        const ans = bucketCalls.filter((c) => ['answered', 'completed', 'transferred'].includes(c.status)).length;
+
+        activityChart.push({ time: label, calls: bucketCalls.length, answered: ans, leads: bucketLeads.length });
       }
     }
 
-    // Intent distribution
+    // Intent distribution from real calls
     const intentMap = {};
     calls.forEach((c) => {
       const intent = c.intent || 'General Inquiry';
@@ -87,30 +99,25 @@ exports.getAnalytics = async (req, res, next) => {
 
     const intentData = Object.keys(intentMap).length > 0
       ? Object.keys(intentMap).map((k) => ({ name: k, value: intentMap[k] }))
-      : [
-          { name: 'Service Inquiries', value: 42 },
-          { name: 'Appointment Booking', value: 28 },
-          { name: 'Pricing Questions', value: 18 },
-          { name: 'Human Support Request', value: 12 },
-        ];
+      : [];
 
     res.json({
       success: true,
       metrics: {
-        totalCalls: Math.max(totalCalls, 48),
-        answeredCalls: Math.max(answeredCalls, 45),
-        missedCalls: Math.max(missedCalls, 3),
-        averageDurationSeconds: avgDuration || 118,
-        leadsCount: Math.max(leads.length, 29),
-        qualifiedLeads: Math.max(qualifiedLeads, 22),
-        appointmentsBooked: Math.max(totalAppointments, 14),
-        transfersCount: Math.max(transferredCalls, 3),
-        aiResolutionRate: Math.max(aiResolutionRate, 92),
-        bookingRate: Math.max(bookingRate, 29),
-        leadRate: Math.max(leadRate, 60),
-        transferRate: Math.max(transferRate, 6),
-        averageCallCost: avgCostPerCall || 0.18,
-        totalCost: Number(totalCost.toFixed(2)) || 8.64,
+        totalCalls,
+        answeredCalls,
+        missedCalls,
+        averageDurationSeconds: avgDuration,
+        leadsCount: leads.length,
+        qualifiedLeads,
+        appointmentsBooked: totalAppointments,
+        transfersCount: transferredCalls,
+        aiResolutionRate,
+        bookingRate,
+        leadRate,
+        transferRate,
+        averageCallCost: avgCostPerCall,
+        totalCost: Number(totalCost.toFixed(2)),
       },
       charts: {
         activityChart,

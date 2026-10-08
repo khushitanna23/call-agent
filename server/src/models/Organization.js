@@ -32,7 +32,7 @@ const OrganizationSchema = new mongoose.Schema(
     },
     minutesUsed: {
       type: Number,
-      default: 142,
+      default: 0,
     },
     phoneNumbers: [
       {

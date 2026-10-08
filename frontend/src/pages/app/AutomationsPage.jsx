@@ -61,48 +61,7 @@ export const AutomationsPage = () => {
     },
   ];
 
-  const [automations, setAutomations] = useState([
-    {
-      id: 'auto-1',
-      name: 'New Lead Follow-up',
-      trigger: 'lead_qualified',
-      action: 'send_sms_followup',
-      isActive: true,
-      executionCount: 29,
-    },
-    {
-      id: 'auto-2',
-      name: 'Appointment Reminder',
-      trigger: 'appointment_booked',
-      action: 'send_sms_reminder',
-      isActive: true,
-      executionCount: 14,
-    },
-    {
-      id: 'auto-3',
-      name: 'Missed Call Follow-up',
-      trigger: 'call_missed',
-      action: 'send_sms_callback',
-      isActive: true,
-      executionCount: 8,
-    },
-    {
-      id: 'auto-4',
-      name: 'Lead Qualification & CRM Sync',
-      trigger: 'call_completed',
-      action: 'ai_lead_qualification',
-      isActive: true,
-      executionCount: 48,
-    },
-    {
-      id: 'auto-5',
-      name: 'Email Call Transcript to Account Execs',
-      trigger: 'call_completed',
-      action: 'send_email_summary',
-      isActive: true,
-      executionCount: 48,
-    },
-  ]);
+  const [automations, setAutomations] = useState([]);
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [newAuto, setNewAuto] = useState({
@@ -248,58 +207,71 @@ export const AutomationsPage = () => {
         </h2>
 
         <div className="space-y-4">
-          {automations.map((auto) => (
-            <Card key={auto.id} className="p-5" hover>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
-                      auto.isActive
-                        ? 'bg-cyan-500/10 border-cyan-500/30 text-brand-cyan shadow-glow'
-                        : 'bg-navy-900 border-slate-800 text-slate-500'
-                    }`}
-                  >
-                    <Zap className="w-5 h-5" />
-                  </div>
+          {automations.length === 0 ? (
+            <Card className="p-8 text-center border-dashed border-slate-800">
+              <Zap className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-white">No Active Automation Rules</h3>
+              <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-3">
+                No custom or active workflows are currently enabled. Deploy any master template above with 1-click or create a custom rule.
+              </p>
+              <Button variant="outline" size="sm" icon={Plus} onClick={() => setCreateModalOpen(true)}>
+                Build Custom Rule
+              </Button>
+            </Card>
+          ) : (
+            automations.map((auto) => (
+              <Card key={auto.id} className="p-5" hover>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+                        auto.isActive
+                          ? 'bg-cyan-500/10 border-cyan-500/30 text-brand-cyan shadow-glow'
+                          : 'bg-navy-900 border-slate-800 text-slate-500'
+                      }`}
+                    >
+                      <Zap className="w-5 h-5" />
+                    </div>
 
-                  <div>
-                    <h3 className="text-sm font-bold text-white">{auto.name}</h3>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
-                      <span className="text-slate-400">Trigger:</span>
-                      <Badge variant="cyan" size="xs">
-                        {formatText(auto.trigger)}
-                      </Badge>
-                      <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-                      <span className="text-slate-400">Action:</span>
-                      <Badge variant="indigo" size="xs">
-                        {formatText(auto.action)}
-                      </Badge>
+                    <div>
+                      <h3 className="text-sm font-bold text-white">{auto.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs">
+                        <span className="text-slate-400">Trigger:</span>
+                        <Badge variant="cyan" size="xs">
+                          {formatText(auto.trigger)}
+                        </Badge>
+                        <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-slate-400">Action:</span>
+                        <Badge variant="indigo" size="xs">
+                          {formatText(auto.action)}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right hidden sm:block">
-                    <span className="text-[11px] text-slate-400 block font-mono">
-                      Executed {auto.executionCount} times
-                    </span>
-                    <span className="text-[10px] text-emerald-400">100% Success</span>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right hidden sm:block">
+                      <span className="text-[11px] text-slate-400 block font-mono">
+                        Executed {auto.executionCount} times
+                      </span>
+                      <span className="text-[10px] text-emerald-400">100% Success</span>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggle(auto.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                        auto.isActive
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : 'bg-navy-900 text-slate-500 border-slate-800 hover:text-white'
+                      }`}
+                    >
+                      {auto.isActive ? 'Active' : 'Disabled'}
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() => handleToggle(auto.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
-                      auto.isActive
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                        : 'bg-navy-900 text-slate-500 border-slate-800 hover:text-white'
-                    }`}
-                  >
-                    {auto.isActive ? 'Active' : 'Disabled'}
-                  </button>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          )}
         </div>
       </div>
 

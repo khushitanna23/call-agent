@@ -5,12 +5,15 @@ const KnowledgeChunk = require('../models/KnowledgeChunk');
 const aiService = require('../services/aiService');
 const scrapeService = require('../services/scrapeService');
 
-// @desc    Get all agents for current organization
+// @desc    Get all agents for current organization (or platform-wide for admin)
 // @route   GET /api/agents
 // @access  Private
 exports.getAgents = async (req, res, next) => {
   try {
-    const agents = await Agent.find({ organizationId: req.organizationId }).sort({ createdAt: -1 });
+    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
+    const agents = await Agent.find(query)
+      .populate('organizationId', 'name slug')
+      .sort({ createdAt: -1 });
     res.json({ success: true, count: agents.length, data: agents });
   } catch (error) {
     next(error);
@@ -22,10 +25,8 @@ exports.getAgents = async (req, res, next) => {
 // @access  Private
 exports.getAgentById = async (req, res, next) => {
   try {
-    const agent = await Agent.findOne({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    });
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    const agent = await Agent.findOne(query).populate('organizationId', 'name slug');
 
     if (!agent) {
       return res.status(404).json({ success: false, message: 'Agent not found' });
@@ -126,6 +127,14 @@ exports.createAgent = async (req, res, next) => {
       }
     }
 
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_agent_created', { agent });
+        io.emit('agent_created', { agent });
+      }
+    } catch (socketErr) {}
+
     res.status(201).json({
       success: true,
       message: 'AI Receptionist created successfully',
@@ -141,10 +150,8 @@ exports.createAgent = async (req, res, next) => {
 // @access  Private
 exports.updateAgent = async (req, res, next) => {
   try {
-    let agent = await Agent.findOne({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    });
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    let agent = await Agent.findOne(query);
 
     if (!agent) {
       return res.status(404).json({ success: false, message: 'Agent not found' });
@@ -154,6 +161,14 @@ exports.updateAgent = async (req, res, next) => {
       new: true,
       runValidators: true,
     });
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_agent_updated', { agent });
+        io.emit('agent_updated', { agent });
+      }
+    } catch (socketErr) {}
 
     res.json({ success: true, message: 'Agent updated successfully', data: agent });
   } catch (error) {
@@ -166,16 +181,23 @@ exports.updateAgent = async (req, res, next) => {
 // @access  Private
 exports.deleteAgent = async (req, res, next) => {
   try {
-    const agent = await Agent.findOne({
-      _id: req.params.id,
-      organizationId: req.organizationId,
-    });
+    const query = req.user?.role === 'admin' ? { _id: req.params.id } : { _id: req.params.id, organizationId: req.organizationId };
+    const agent = await Agent.findOne(query);
 
     if (!agent) {
       return res.status(404).json({ success: false, message: 'Agent not found' });
     }
 
     await Agent.findByIdAndDelete(req.params.id);
+
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to('admin_global').emit('admin_agent_deleted', { id: req.params.id });
+        io.emit('agent_deleted', { id: req.params.id });
+      }
+    } catch (socketErr) {}
+
     res.json({ success: true, message: 'Agent deleted successfully' });
   } catch (error) {
     next(error);

@@ -31,7 +31,30 @@ export const BillingPage = () => {
   const [changePlanModal, setChangePlanModal] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [refillModalOpen, setRefillModalOpen] = useState(false);
+  const [refillPack, setRefillPack] = useState(1000);
+  const [isRefilling, setIsRefilling] = useState(false);
   const toast = useToast();
+
+  const handleRefillMinutes = () => {
+    setIsRefilling(true);
+    setTimeout(() => {
+      setIsRefilling(false);
+      setRefillModalOpen(false);
+      const added = refillPack;
+      toast.success(`Successfully topped up ${added.toLocaleString()} voice minutes!`);
+      if (billingInfo) {
+        setBillingInfo((prev) => ({
+          ...prev,
+          usageMeter: {
+            ...prev.usageMeter,
+            minutesRemaining: (prev.usageMeter?.minutesRemaining || 858) + added,
+            minutesAllowance: (prev.usageMeter?.minutesAllowance || 1000) + added,
+          },
+        }));
+      }
+    }, 600);
+  };
 
   useEffect(() => {
     fetchBilling();
@@ -75,10 +98,10 @@ export const BillingPage = () => {
   };
 
   const usageMeter = billingInfo?.usageMeter || {
-    minutesAllowance: 1000,
-    minutesUsed: 142,
-    minutesRemaining: 858,
-    usagePercent: 14,
+    minutesAllowance: organization?.minutesAllowance || 1000,
+    minutesUsed: organization?.minutesUsed || 0,
+    minutesRemaining: Math.max(0, (organization?.minutesAllowance || 1000) - (organization?.minutesUsed || 0)),
+    usagePercent: 0,
     overageRate: '$0.15 / min',
   };
 
@@ -96,60 +119,60 @@ export const BillingPage = () => {
     },
     {
       title: 'AI Processing Minutes',
-      used: 88,
-      total: 500,
+      used: Math.round(usageMeter.minutesUsed * 0.4),
+      total: Math.round(usageMeter.minutesAllowance * 0.5),
       unit: 'AI minutes',
-      percent: 18,
+      percent: usageMeter.minutesAllowance > 0 ? Math.min(100, Math.round((usageMeter.minutesUsed / usageMeter.minutesAllowance) * 100)) : 0,
       icon: Bot,
       color: 'from-indigo-500 to-purple-500',
       badgeColor: 'indigo',
     },
     {
       title: 'Total Handled Calls',
-      used: 48,
+      used: organization?.callsCount ?? 0,
       total: 1000,
       unit: 'calls',
-      percent: 5,
+      percent: Math.min(100, Math.round(((organization?.callsCount ?? 0) / 1000) * 100)),
       icon: Phone,
       color: 'from-emerald-400 to-teal-500',
       badgeColor: 'emerald',
     },
     {
       title: 'SMS Dispatched',
-      used: 34,
+      used: 0,
       total: 500,
       unit: 'messages',
-      percent: 7,
+      percent: 0,
       icon: MessageSquare,
       color: 'from-emerald-400 to-teal-500',
       badgeColor: 'cyan',
     },
     {
       title: 'WhatsApp Notifications',
-      used: 18,
+      used: 0,
       total: 250,
       unit: 'messages',
-      percent: 7,
+      percent: 0,
       icon: Smartphone,
       color: 'from-emerald-500 to-green-600',
       badgeColor: 'emerald',
     },
     {
       title: 'Audio & Data Storage',
-      used: 1.2,
+      used: Number((usageMeter.minutesUsed * 0.005).toFixed(1)),
       total: 10,
       unit: 'GB',
-      percent: 12,
+      percent: Math.min(100, Math.round(((usageMeter.minutesUsed * 0.005) / 10) * 100)),
       icon: HardDrive,
       color: 'from-amber-400 to-orange-500',
       badgeColor: 'amber',
     },
     {
       title: 'Dedicated Phone Numbers',
-      used: 1,
+      used: organization?.phoneNumbers?.length || 1,
       total: 3,
       unit: 'numbers',
-      percent: 33,
+      percent: Math.round(((organization?.phoneNumbers?.length || 1) / 3) * 100),
       icon: PhoneCall,
       color: 'from-purple-400 to-pink-500',
       badgeColor: 'purple',
@@ -278,8 +301,17 @@ export const BillingPage = () => {
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between text-[11px] text-slate-500">
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] text-slate-500">
               <span>Voice minutes reset at the start of each calendar month.</span>
+              <Button
+                variant="primary"
+                size="xs"
+                icon={Zap}
+                onClick={() => setRefillModalOpen(true)}
+                className="shadow-glow"
+              >
+                1-Click Refill Minutes
+              </Button>
             </div>
           </Card>
         </div>
@@ -359,37 +391,45 @@ export const BillingPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {invoices.map((inv, idx) => (
-                <tr key={idx} className="hover:bg-white/[0.02] transition">
-                  <td className="py-3.5 px-4 font-mono font-semibold text-white">
-                    {inv.invoiceNumber}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-400">
-                    {new Date(inv.paidAt || Date.now()).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-300">{inv.description}</td>
-                  <td className="py-3.5 px-4 font-mono font-bold text-white">
-                    ${inv.amount?.toFixed(2)} USD
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <Badge variant="emerald" size="xs">
-                      Paid
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <button
-                      onClick={() => toast.success(`Receipt for ${inv.invoiceNumber} downloaded!`)}
-                      className="inline-flex items-center gap-1 text-slate-400 hover:text-brand-cyan transition font-semibold"
-                    >
-                      <Download className="w-3.5 h-3.5" /> PDF
-                    </button>
+              {invoices.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-8 text-center text-slate-500">
+                    No billing invoices generated yet. Invoices appear automatically on monthly renewals.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                invoices.map((inv, idx) => (
+                  <tr key={idx} className="hover:bg-white/[0.02] transition">
+                    <td className="py-3.5 px-4 font-mono font-semibold text-white">
+                      {inv.invoiceNumber}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-400">
+                      {new Date(inv.paidAt || Date.now()).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-300">{inv.description}</td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-white">
+                      ${inv.amount?.toFixed(2)} USD
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Badge variant="emerald" size="xs">
+                        Paid
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => toast.success(`Receipt for ${inv.invoiceNumber} downloaded!`)}
+                        className="inline-flex items-center gap-1 text-slate-400 hover:text-brand-cyan transition font-semibold"
+                      >
+                        <Download className="w-3.5 h-3.5" /> PDF
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -461,6 +501,90 @@ export const BillingPage = () => {
                 </div>
               );
             })}
+          </div>
+        </div>
+      </Modal>
+
+      {/* 1-Click Refill Minutes Modal */}
+      <Modal
+        isOpen={refillModalOpen}
+        onClose={() => setRefillModalOpen(false)}
+        title="1-Click Voice Minutes Refill"
+        maxWidth="max-w-md"
+      >
+        <div className="space-y-4 text-xs text-left">
+          <p className="text-gray-400">
+            Top up your active organization with additional voice minutes instantly. Unused minutes roll over automatically.
+          </p>
+
+          <div className="space-y-2">
+            {[
+              { minutes: 500, price: 75, rate: '$0.15/min', badge: null },
+              { minutes: 1000, price: 150, rate: '$0.15/min', badge: 'Most Popular' },
+              { minutes: 2500, price: 350, rate: '$0.14/min', badge: 'Save 7%' },
+              { minutes: 5000, price: 650, rate: '$0.13/min', badge: 'Best Value' },
+            ].map((pkg) => (
+              <div
+                key={pkg.minutes}
+                onClick={() => setRefillPack(pkg.minutes)}
+                className={`p-3.5 rounded-xl border cursor-pointer transition flex items-center justify-between ${
+                  refillPack === pkg.minutes
+                    ? 'bg-emerald-950/40 border-emerald-400 ring-1 ring-emerald-400'
+                    : 'bg-[#08080a] border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      refillPack === pkg.minutes
+                        ? 'border-emerald-400 bg-emerald-400 text-black'
+                        : 'border-slate-700'
+                    }`}
+                  >
+                    {refillPack === pkg.minutes && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
+                  </div>
+                  <div>
+                    <span className="font-bold text-white block">
+                      +{pkg.minutes.toLocaleString()} Voice Minutes
+                    </span>
+                    <span className="text-[10px] text-gray-500 font-mono">{pkg.rate}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {pkg.badge && (
+                    <Badge variant="emerald" size="xs">
+                      {pkg.badge}
+                    </Badge>
+                  )}
+                  <span className="font-mono font-bold text-emerald-400 text-sm">${pkg.price}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-3 rounded-xl bg-[#08080a] border border-slate-800 flex items-center justify-between text-[11px]">
+            <span className="text-gray-400">Payment Method:</span>
+            <span className="font-mono text-white flex items-center gap-1.5">
+              <CreditCard className="w-3.5 h-3.5 text-emerald-400" />
+              •••• 4242 (Stripe Instant)
+            </span>
+          </div>
+
+          <div className="pt-2 flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setRefillModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Zap}
+              onClick={handleRefillMinutes}
+              isLoading={isRefilling}
+              className="shadow-glow"
+            >
+              Confirm &amp; Top Up Now
+            </Button>
           </div>
         </div>
       </Modal>

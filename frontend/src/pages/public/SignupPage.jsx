@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bot, User, Mail, Lock, Building, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Bot, User, Mail, Lock, Building, ArrowRight, ShieldCheck, Eye, EyeOff, Shield, Building2 } from 'lucide-react';
 import { Button } from '../../components/common/Button';
+import { GoogleSignInButton } from '../../components/common/GoogleSignInButton';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
@@ -11,7 +12,9 @@ export const SignupPage = () => {
     email: '',
     password: '',
     companyName: '',
+    role: 'client',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const { register } = useAuth();
@@ -27,9 +30,16 @@ export const SignupPage = () => {
 
     try {
       setIsLoading(true);
-      await register(formData.name, formData.email, formData.password, formData.companyName);
-      toast.success('Organization created successfully! Welcome to VEDANCO AI.');
-      navigate('/app/dashboard');
+      const res = await register(
+        formData.name,
+        formData.email,
+        formData.password,
+        formData.companyName,
+        formData.role
+      );
+      toast.success('Workspace created successfully! Welcome to VEDANCO AI.');
+      const dest = res?.role === 'admin' || formData.role === 'admin' ? '/admin/dashboard' : '/client/dashboard';
+      navigate(dest);
     } catch (err) {
       toast.error(err?.message || (typeof err === 'string' ? err : 'Registration failed'));
     } finally {
@@ -52,19 +62,71 @@ export const SignupPage = () => {
           </span>
         </Link>
         <h2 className="text-2xl font-bold tracking-tight text-white">
-          Deploy Your AI Receptionist
+          Create Your AI Voice Workspace
         </h2>
         <p className="mt-2 text-xs text-gray-400">
           Already registered?{' '}
           <Link to="/login" className="font-semibold text-emerald-400 hover:underline">
-            Sign in here
+            Sign in to existing account
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
         <div className="glass-panel py-8 px-6 sm:px-10 rounded-3xl border border-emerald-500/25 shadow-2xl">
+          {/* Google Sign-in */}
+          <div className="mb-5">
+            <GoogleSignInButton
+              label="Sign up with Google"
+              onSuccess={(res) => {
+                const target = res?.role === 'admin' ? '/admin/dashboard' : '/client/dashboard';
+                navigate(target);
+              }}
+            />
+            <div className="relative my-5">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-emerald-950/80" />
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-wider">
+                <span className="bg-[#0c0c0e] px-3 text-gray-400">Or register with email</span>
+              </div>
+            </div>
+          </div>
+
           <form className="space-y-4" onSubmit={handleSignup}>
+            {/* Role selector */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                Account Type
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'client' })}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                    formData.role === 'client'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-sm'
+                      : 'bg-[#08080a] border-emerald-950 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  <span>Client Workspace</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, role: 'admin' })}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                    formData.role === 'admin'
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm'
+                      : 'bg-[#08080a] border-emerald-950 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Agency Admin</span>
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1.5">
                 Full Name *
@@ -78,7 +140,7 @@ export const SignupPage = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Abc Xyz"
+                  placeholder="Khushi Tanna"
                   className="w-full bg-[#08080a] border border-emerald-950/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
                 />
               </div>
@@ -86,18 +148,18 @@ export const SignupPage = () => {
 
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                Work Email or Username / ID *
+                Work Email *
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-500">
                   <Mail className="w-4 h-4" />
                 </div>
                 <input
-                  type="text"
+                  type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="username, admin, or name@company.com"
+                  placeholder="name@company.com"
                   className="w-full bg-[#08080a] border border-emerald-950/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
                 />
               </div>
@@ -115,7 +177,7 @@ export const SignupPage = () => {
                   type="text"
                   value={formData.companyName}
                   onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                  placeholder="Acme Real Estate Group"
+                  placeholder="Apex Real Estate & Consulting"
                   className="w-full bg-[#08080a] border border-emerald-950/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
                 />
               </div>
@@ -130,13 +192,20 @@ export const SignupPage = () => {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Enter any password"
-                  className="w-full bg-[#08080a] border border-emerald-950/80 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
+                  placeholder="Create a password"
+                  className="w-full bg-[#08080a] border border-emerald-950/80 rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-300"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -148,14 +217,14 @@ export const SignupPage = () => {
                 isLoading={isLoading}
                 className="w-full py-3 shadow-glow"
               >
-                Create AI Workspace <ArrowRight className="w-4 h-4 ml-1.5" />
+                Create Workspace & Launch Sarah <ArrowRight className="w-4 h-4 ml-1.5" />
               </Button>
             </div>
           </form>
 
           <div className="mt-6 flex items-center justify-center gap-2 text-[11px] text-gray-400">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>14-day full feature trial • No credit card required</span>
+            <span>Multi-tenant encrypted • Dedicated AI Receptionist included</span>
           </div>
         </div>
       </div>

@@ -5,7 +5,11 @@ const LeadSchema = new mongoose.Schema(
     organizationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
-      required: true,
+      index: true,
+    },
+    orgId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
       index: true,
     },
     name: {
@@ -29,12 +33,16 @@ const LeadSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ['Inbound AI Call', 'Website Form', 'Direct Call', 'Demo Request', 'Outbound', 'Manual'],
       default: 'Inbound AI Call',
+    },
+    stage: {
+      type: String,
+      enum: ['new', 'contacted', 'qualified', 'appointment', 'proposal', 'won', 'lost', 'NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT', 'PROPOSAL', 'WON', 'LOST'],
+      default: 'new',
     },
     pipelineStage: {
       type: String,
-      enum: ['NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT', 'PROPOSAL', 'WON', 'LOST'],
+      enum: ['NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT', 'PROPOSAL', 'WON', 'LOST', 'new', 'contacted', 'qualified', 'appointment', 'proposal', 'won', 'lost'],
       default: 'NEW',
     },
     intent: {
@@ -43,11 +51,17 @@ const LeadSchema = new mongoose.Schema(
     },
     budget: {
       type: String,
-      default: '$5,000 - $10,000',
+      default: '',
     },
     requirements: {
       type: String,
       default: '',
+    },
+    score: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 85,
     },
     aiScore: {
       type: Number,
@@ -78,5 +92,19 @@ const LeadSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Pre-save hook to mirror orgId, score, and stage
+LeadSchema.pre('save', function (next) {
+  if (this.orgId && !this.organizationId) this.organizationId = this.orgId;
+  if (this.organizationId && !this.orgId) this.orgId = this.organizationId;
+
+  if (this.score !== undefined && this.aiScore === undefined) this.aiScore = this.score;
+  if (this.aiScore !== undefined && this.score === undefined) this.score = this.aiScore;
+
+  if (this.stage && !this.pipelineStage) this.pipelineStage = this.stage.toUpperCase();
+  if (this.pipelineStage && !this.stage) this.stage = this.pipelineStage.toLowerCase();
+
+  next();
+});
 
 module.exports = mongoose.model('Lead', LeadSchema);

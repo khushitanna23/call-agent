@@ -22,6 +22,7 @@ import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/client';
+import { io } from 'socket.io-client';
 
 export const LeadsPage = () => {
   const [leads, setLeads] = useState([]);
@@ -33,6 +34,8 @@ export const LeadsPage = () => {
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [stageCounts, setStageCounts] = useState({});
   const [newLeadModalOpen, setNewLeadModalOpen] = useState(false);
+  const [draggingLeadId, setDraggingLeadId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
 
   // New lead form
   const [newLeadData, setNewLeadData] = useState({
@@ -52,6 +55,29 @@ export const LeadsPage = () => {
 
   useEffect(() => {
     fetchLeads();
+
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+    });
+
+    const orgId = localStorage.getItem('vedanco_org_id');
+    socket.on('connect', () => {
+      if (orgId) socket.emit('join_org', orgId);
+    });
+
+    socket.on('lead_updated', (updatedLead) => {
+      toast.info(`🎯 Lead Qualified: ${updatedLead.name} (${updatedLead.pipelineStage || 'APPOINTMENT'})`);
+      fetchLeads();
+    });
+
+    socket.on('appointment_booked', () => {
+      fetchLeads();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [stageFilter]);
 
   const fetchLeads = async () => {
@@ -206,42 +232,80 @@ export const LeadsPage = () => {
         </div>
       </div>
 
-      {/* KANBAN VIEW (SECTION 19) */}
+      {/* KANBAN VIEW (All 5 Stages with HTML5 Drag-and-Drop) */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
-          {stages.slice(0, 4).map((st) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 overflow-x-auto pb-4">
+          {['NEW', 'CONTACTED', 'QUALIFIED', 'APPOINTMENT', 'PROPOSAL'].map((st) => {
             const stageLeads = leads.filter((l) => l.pipelineStage === st);
+            const isTarget = dragOverStage === st;
+
             return (
               <div
                 key={st}
-                className="bg-navy-900/60 rounded-2xl p-4 border border-slate-800/80 flex flex-col min-w-[260px]"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (dragOverStage !== st) setDragOverStage(st);
+                }}
+                onDragLeave={() => {
+                  if (dragOverStage === st) setDragOverStage(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const droppedId = e.dataTransfer.getData('text/plain') || draggingLeadId;
+                  if (droppedId) {
+                    handleUpdateStage(droppedId, st);
+                  }
+                  setDraggingLeadId(null);
+                  setDragOverStage(null);
+                }}
+                className={`rounded-2xl p-3.5 flex flex-col min-w-[240px] transition-all border ${
+                  isTarget
+                    ? 'bg-emerald-950/40 border-emerald-400 ring-2 ring-emerald-500/30'
+                    : 'bg-[#0c0c0e]/80 border-slate-800/80 hover:border-slate-700'
+                }`}
               >
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
-                  <span className="text-xs font-bold text-white tracking-wider uppercase">
-                    {st}
-                  </span>
-                  <Badge variant="cyan" size="xs">
+                <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="text-[11px] font-bold text-white tracking-wider uppercase font-mono">
+                      {st.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <Badge variant={stageLeads.length > 0 ? 'emerald' : 'cyan'} size="xs">
                     {stageLeads.length}
                   </Badge>
                 </div>
 
-                <div className="space-y-3 flex-1 overflow-y-auto max-h-[550px]">
+                <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[580px] min-h-[140px]">
                   {stageLeads.length === 0 ? (
-                    <div className="py-8 text-center text-slate-500 text-xs">
-                      No leads in {st}
+                    <div className="py-10 text-center text-gray-500 text-xs border border-dashed border-slate-800/80 rounded-xl">
+                      Drop lead here
                     </div>
                   ) : (
                     stageLeads.map((lead) => (
                       <div
                         key={lead._id}
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggingLeadId(lead._id);
+                          e.dataTransfer.setData('text/plain', lead._id);
+                        }}
+                        onDragEnd={() => {
+                          setDraggingLeadId(null);
+                          setDragOverStage(null);
+                        }}
                         onClick={() => {
                           setSelectedLead(lead);
                           setIsLeadModalOpen(true);
                         }}
-                        className="glass-card p-4 rounded-xl border border-slate-800 hover:border-cyan-500/40 cursor-pointer transition flex flex-col gap-2 group"
+                        className={`p-3.5 rounded-xl border cursor-grab active:cursor-grabbing transition-all flex flex-col gap-2 group shadow-sm ${
+                          draggingLeadId === lead._id
+                            ? 'opacity-40 border-dashed border-emerald-400 bg-emerald-950/30'
+                            : 'bg-[#121216] border-slate-800 hover:border-emerald-500/40 hover:bg-[#16161c]'
+                        }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-xs font-bold text-white group-hover:text-brand-cyan transition">
+                        <div className="flex items-start justify-between gap-1.5">
+                          <h4 className="text-xs font-bold text-white group-hover:text-emerald-400 transition leading-tight">
                             {lead.name}
                           </h4>
                           <Badge variant={scoreBadgeVariant(lead.aiScore)} size="xs">
@@ -250,19 +314,26 @@ export const LeadsPage = () => {
                         </div>
 
                         {lead.company && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                            <Building className="w-3.5 h-3.5 text-slate-500" />
+                          <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                            <Building className="w-3 h-3 text-gray-500 shrink-0" />
                             <span className="truncate">{lead.company}</span>
                           </div>
                         )}
 
-                        <div className="text-[11px] text-brand-cyan/90 font-medium truncate">
+                        <div className="text-[11px] text-emerald-300 font-medium truncate">
                           {lead.intent}
                         </div>
 
-                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
-                          <span>{lead.budget}</span>
-                          <span className="capitalize">{lead.source}</span>
+                        {lead.phone && (
+                          <div className="flex items-center gap-1 text-[10px] font-mono text-gray-400">
+                            <Phone className="w-2.5 h-2.5 text-gray-500" />
+                            <span>{lead.phone}</span>
+                          </div>
+                        )}
+
+                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-gray-400">
+                          <span className="font-mono text-emerald-400 font-semibold">{lead.budget || '$5,000'}</span>
+                          <span className="capitalize text-gray-500">{lead.source || 'Inbound Call'}</span>
                         </div>
                       </div>
                     ))
@@ -289,7 +360,15 @@ export const LeadsPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {leads.map((l) => (
+                {leads.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="py-16 text-center text-gray-500">
+                      <Target className="w-10 h-10 mx-auto mb-2 opacity-30 text-emerald-400" />
+                      <p className="font-semibold text-gray-300 text-sm">No leads captured yet</p>
+                      <p className="text-gray-500 mt-1">Make a test call or receive incoming calls to see qualified leads appear here.</p>
+                    </td>
+                  </tr>
+                ) : leads.map((l) => (
                   <tr key={l._id} className="hover:bg-white/[0.02] transition">
                     <td className="py-3.5 px-4">
                       <div className="font-bold text-white text-sm">{l.name}</div>

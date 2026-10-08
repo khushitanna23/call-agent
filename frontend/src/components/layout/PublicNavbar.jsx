@@ -1,13 +1,26 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bot, PhoneCall, Sparkles, Menu, X, ArrowRight, LayoutDashboard } from 'lucide-react';
+import {
+  Bot,
+  PhoneCall,
+  Sparkles,
+  Menu,
+  X,
+  ArrowRight,
+  LayoutDashboard,
+  Shield,
+  Building2,
+  LogOut,
+  ChevronDown,
+} from 'lucide-react';
 import { Button } from '../common/Button';
 import { useAuth } from '../../context/AuthContext';
 
 export const PublicNavbar = ({ onOpenVoiceDemo }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, isAdmin, logout, defaultDashboardPath } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 bg-[#050505]/95 backdrop-blur-xl border-b border-emerald-950/40 shadow-xs transition-all">
@@ -36,28 +49,107 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
         </div>
 
         {/* CTA Buttons */}
-        <div className="hidden md:flex items-center gap-3">
-          <Link to="/login">
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 font-semibold px-4"
-            >
-              Login
-            </Button>
-          </Link>
-
+        <div className="hidden md:flex items-center gap-2.5">
           {isAuthenticated ? (
-            <Button
-              variant="primary"
-              size="sm"
-              icon={LayoutDashboard}
-              onClick={() => navigate('/app/dashboard')}
-            >
-              Dashboard
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                icon={LayoutDashboard}
+                onClick={() => navigate(defaultDashboardPath || '/client/dashboard')}
+              >
+                Dashboard
+              </Button>
+
+              {/* User Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-[#121215] hover:bg-[#18181f] border border-slate-800 text-xs text-white transition"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="font-semibold text-xs max-w-[120px] truncate">{user?.name || user?.email}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+
+                {userDropdownOpen && (
+                  <div
+                    className="absolute right-0 mt-2 w-56 glass-panel rounded-2xl p-2 border border-slate-800 shadow-2xl z-50 animate-in fade-in"
+                    onClick={() => setUserDropdownOpen(false)}
+                  >
+                    <div className="px-3 py-2 border-b border-slate-850">
+                      <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{user?.email}</p>
+                      <span className="inline-block mt-1 text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
+                        {user?.role || (isAdmin ? 'Admin' : 'Client')}
+                      </span>
+                    </div>
+
+                    <div className="py-1">
+                      <Link
+                        to="/client/dashboard"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition"
+                      >
+                        <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+                        Client Workspace
+                      </Link>
+                      <Link
+                        to="/admin/dashboard"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-amber-300 hover:bg-amber-500/10 rounded-xl transition"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-amber-400" />
+                        Admin Cockpit
+                      </Link>
+                      <Link
+                        to="/login?switch=true"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-cyan-300 hover:bg-cyan-500/10 rounded-xl transition"
+                      >
+                        <Bot className="w-3.5 h-3.5 text-cyan-400" />
+                        Switch / Google Sign-In
+                      </Link>
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-850">
+                      <button
+                        onClick={() => {
+                          logout();
+                          navigate('/login');
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
             <>
+              {/* Separate, direct Client & Admin Login routes */}
+              <Link to="/login?role=client">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 font-semibold px-3"
+                >
+                  Client Login
+                </Button>
+              </Link>
+
+              <Link to="/login?role=admin">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 font-semibold px-3"
+                >
+                  <Shield className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                  Admin Portal
+                </Button>
+              </Link>
+
               <Button
                 variant="secondary"
                 size="sm"
@@ -72,7 +164,7 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
                 size="sm"
                 onClick={() => navigate('/signup')}
               >
-                Get Started Free
+                Get Started
               </Button>
             </>
           )}
@@ -84,7 +176,7 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
             <Button
               variant="outline"
               size="sm"
-              className="text-xs px-3 py-1 text-emerald-400 border-emerald-500/40 font-semibold"
+              className="text-xs px-2.5 py-1 text-emerald-400 border-emerald-500/40 font-semibold"
             >
               Login
             </Button>
@@ -137,7 +229,7 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
                 className="w-full"
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  navigate('/app/dashboard');
+                  navigate(defaultDashboardPath || '/client/dashboard');
                 }}
               >
                 Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
