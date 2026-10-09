@@ -70,14 +70,19 @@ exports.bookDemo = async (req, res, next) => {
 // @access  Public
 exports.voiceTurn = async (req, res, next) => {
   try {
-    const { messages = [] } = req.body;
+    const { messages = [], language = 'english', agentName = 'Sarah' } = req.body;
 
+    const isGu = language === 'gujarati';
     const demoAgent = {
-      name: 'Sarah',
+      name: agentName,
+      language,
       industry: 'Technology & Business Services',
-      personality: 'Warm, articulate, welcoming, and sharp. She speaks with a crisp natural cadence.',
-      systemInstructions:
-        'You are Sarah, the flagship AI Receptionist for VEDANCO AI. You answer visitor inquiries, explain how VEDANCO AI Receptionists answer calls 24/7, qualify leads, and book appointments. Answer directly, naturally, and warmly.',
+      personality: isGu
+        ? 'નમ્ર, સ્પષ્ટ, સન્માનજનક અને મદદગાર. કુદરતી ગુજરાતી ભાષામાં વાતચીત કરે છે.'
+        : 'Warm, articulate, welcoming, and sharp. She speaks with a crisp natural cadence.',
+      systemInstructions: isGu
+        ? 'તમે VEDANCO AI ના મુખ્ય AI રિસેપ્શનિસ્ટ છો. તમે મુલાકાતીઓના પ્રશ્નોના જવાબો આપો છો, VEDANCO AI ની સેવાઓ સમજાવો છો, લીડ મેળવો છો અને એપોઇન્ટમેન્ટ બુક કરો છો. કુદરતી ગુજરાતીમાં જવાબ આપો.'
+        : 'You are Sarah, the flagship AI Receptionist for VEDANCO AI. You answer visitor inquiries, explain how VEDANCO AI Receptionists answer calls 24/7, qualify leads, and book appointments. Answer directly, naturally, and warmly.',
       actions: {
         answerCalls: true,
         captureLeads: true,
@@ -91,7 +96,7 @@ exports.voiceTurn = async (req, res, next) => {
       messages,
       agent: demoAgent,
       organizationId: null,
-      context: { callerName: 'Public Demo Visitor' },
+      context: { callerName: 'Public Demo Visitor', language },
     });
 
     res.json({

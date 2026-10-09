@@ -227,6 +227,7 @@ exports.testAgent = async (req, res, next) => {
         industry: req.body.industry || 'Technology',
         personality: req.body.personality,
         systemInstructions: req.body.systemInstructions,
+        language: req.body.language || 'english',
         actions: req.body.actions || {
           answerCalls: true,
           captureLeads: true,
@@ -235,6 +236,8 @@ exports.testAgent = async (req, res, next) => {
           transferCalls: true,
         },
       };
+    } else if (req.body.language) {
+      agent.language = req.body.language;
     }
 
     const aiResponse = await aiService.generateAIResponse({

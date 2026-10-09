@@ -14,6 +14,7 @@ import {
 import { Card, CardHeader } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { LiveVoiceCallModal } from '../../components/voice/LiveVoiceCallModal';
 import { useToast } from '../../context/ToastContext';
 import api from '../../api/client';
 
@@ -22,6 +23,8 @@ export const AgentsPage = () => {
   const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [testAgentName, setTestAgentName] = useState('Sarah');
   const toast = useToast();
 
   useEffect(() => {
@@ -134,6 +137,19 @@ export const AgentsPage = () => {
                 {agent.status === 'ONLINE' ? 'Pause Agent' : 'Set Online'}
               </button>
 
+              <button
+                type="button"
+                onClick={() => {
+                  setTestAgentName(agent.name || 'Sarah');
+                  setTestModalOpen(true);
+                }}
+                className="px-2.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold inline-flex items-center gap-1.5 transition"
+                title={`Test ${agent.name} (English & Gujarati)`}
+              >
+                <PhoneCall className="w-3.5 h-3.5" />
+                <span>Test AI</span>
+              </button>
+
               <Link
                 to={`${basePath}/appointments?book=true&agentId=${agent._id}`}
                 className="px-2.5 py-2 rounded-xl bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 text-xs font-semibold inline-flex items-center gap-1.5 transition"
@@ -242,6 +258,13 @@ export const AgentsPage = () => {
           })}
         </div>
       </div>
+
+      {/* Live Voice & Chat Test Modal with Dual Language English & Gujarati */}
+      <LiveVoiceCallModal
+        isOpen={testModalOpen}
+        onClose={() => setTestModalOpen(false)}
+        agentName={testAgentName}
+      />
     </div>
   );
 };

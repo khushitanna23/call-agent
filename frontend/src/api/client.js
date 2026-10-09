@@ -41,6 +41,148 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Smart AI Dialog Generator supporting English & Gujarati for Sandbox & Voice Simulation
+function generateSmartAIResponse(bodyData = {}) {
+  const messages = Array.isArray(bodyData.messages) ? bodyData.messages : [];
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user' || m.speaker === 'caller')?.content || '';
+  const agentName = bodyData.agentName || 'Sarah';
+  const lang = (bodyData.language || '').toLowerCase();
+
+  // Check if Gujarati explicitly requested or contains Gujarati Unicode range (\u0A80-\u0AFF)
+  const isGujarati = lang === 'gujarati' || /[\u0A80-\u0AFF]/.test(lastUserMsg);
+  const lower = lastUserMsg.toLowerCase();
+
+  let reply = '';
+  let triggeredTool = null;
+
+  if (isGujarati) {
+    if (
+      lower.includes('એપોઇન્ટમેન્ટ') ||
+      lower.includes('બુક') ||
+      lower.includes('સમય') ||
+      lower.includes('તારીખ') ||
+      lower.includes('મળવું') ||
+      lower.includes('શેડ્યૂલ') ||
+      lower.includes('appointment') ||
+      lower.includes('book')
+    ) {
+      reply = `હું તમારી એપોઇન્ટમેન્ટ બુક કરવામાં ચોક્કસ મદદ કરી શકું! અમારી ટીમ સાથે વાત કરવા માટે આવતીકાલે સવારે 10:00 વાગ્યે અથવા બપોરે 2:30 વાગ્યે સ્લોટ ઉપલબ્ધ છે. તમને કયો સમય અનુકૂળ રહેશે?`;
+      triggeredTool = 'checkAvailability';
+    } else if (
+      lower.includes('કિંમત') ||
+      lower.includes('ભાવ') ||
+      lower.includes('પ્લાન') ||
+      lower.includes('રૂપિયા') ||
+      lower.includes('ખર્ચ') ||
+      lower.includes('દર') ||
+      lower.includes('price') ||
+      lower.includes('cost')
+    ) {
+      reply = `અમારા AI કોલ એજન્ટ પ્લાન દર મહિને ફક્ત $99 થી શરૂ થાય છે જેમાં 300 મિનિટ મળે છે. શું તમે તમારા વ્યવસાય માટે વિગતવાર પ્લાન જાણવા માંગો છો?`;
+      triggeredTool = 'searchKnowledge';
+    } else if (
+      lower.includes('મેનેજર') ||
+      lower.includes('માણસ') ||
+      lower.includes('માનવ') ||
+      lower.includes('વાત') ||
+      lower.includes('કનેક્ટ') ||
+      lower.includes('ટ્રાન્સફર') ||
+      lower.includes('transfer') ||
+      lower.includes('human')
+    ) {
+      reply = `ચોક્કસ! હું તમારો કોલ અમારા સિનિયર મેનેજર સાથે ટ્રાન્સફર કરી રહી છું. કૃપા કરીને થોડીવાર લાઇન પર રહો.`;
+      triggeredTool = 'transferCall';
+    } else if (
+      lower.includes('સેવા') ||
+      lower.includes('કામ') ||
+      lower.includes('મદદ') ||
+      lower.includes('શું કરો છો') ||
+      lower.includes('વિશે') ||
+      lower.includes('service') ||
+      lower.includes('help')
+    ) {
+      reply = `અમે 24/7 AI ફોન રિસેપ્શનિસ્ટ સેવા આપીએ છીએ. અમે તમારા દરેક ગ્રાહકનો કોલ અટેન્ડ કરીએ છીએ, એપોઇન્ટમેન્ટ બુક કરીએ છીએ અને લીડ ક્વોલિફાય કરીએ છીએ. શું તમે ડેમો શેડ્યૂલ કરવા માંગો છો?`;
+      triggeredTool = 'getBusinessInfo';
+    } else if (
+      lower.includes('નામ') ||
+      lower.includes('નંબર') ||
+      lower.includes('ફોન') ||
+      lower.includes('ઇમેઇલ') ||
+      lower.includes('@')
+    ) {
+      reply = `તમારી માહિતી આપવા બદલ આભાર! મેં તમારી વિગતો સિસ્ટમમાં નોંધી લીધી છે. અમારા એક્સપર્ટ ટૂંક સમયમાં તમારો સંપર્ક કરશે.`;
+      triggeredTool = 'createLead';
+    } else if (
+      lower.includes('નમસ્તે') ||
+      lower.includes('હેલો') ||
+      lower.includes('પ્રણામ') ||
+      lower.includes('કેમ છો') ||
+      lower.includes('hello') ||
+      lower.includes('hi')
+    ) {
+      reply = `નમસ્તે! VEDANCO AI માં સંપર્ક કરવા બદલ આભાર. મારું નામ ${agentName === 'Sarah' ? 'સારાહ' : agentName} છે, તમારી AI સહાયક. આજે હું તમને કેવી રીતે મદદ કરી શકું?`;
+    } else {
+      reply = `પૂછવા બદલ આભાર! ${agentName} તરીકે હું તમારી કોઈપણ પૂછપરછમાં મદદ કરવા અથવા એપોઇન્ટમેન્ટ શેડ્યૂલ કરવા તૈયાર છું. શું તમે વધુ માહિતી મેળવવા માંગો છો?`;
+    }
+  } else {
+    // English responses
+    if (
+      lower.includes('appointment') ||
+      lower.includes('book') ||
+      lower.includes('schedule') ||
+      lower.includes('time') ||
+      lower.includes('slot')
+    ) {
+      reply = `I would be delighted to schedule a consultation with our team! I have available slots tomorrow at 10:00 AM, 2:00 PM, or 4:30 PM. Which time works best for you?`;
+      triggeredTool = 'checkAvailability';
+    } else if (
+      lower.includes('price') ||
+      lower.includes('pricing') ||
+      lower.includes('cost') ||
+      lower.includes('fee') ||
+      lower.includes('plan')
+    ) {
+      reply = `Our starter plans begin at $99/month with 300 included voice minutes. Would you like me to share more details or help you select a plan?`;
+      triggeredTool = 'searchKnowledge';
+    } else if (
+      lower.includes('transfer') ||
+      lower.includes('human') ||
+      lower.includes('person') ||
+      lower.includes('representative') ||
+      lower.includes('manager')
+    ) {
+      reply = `Certainly! I will connect you right away with our senior support team. Please stay on the line for just a moment while I transfer your call.`;
+      triggeredTool = 'transferCall';
+    } else if (
+      lower.includes('service') ||
+      lower.includes('what do you do') ||
+      lower.includes('help me') ||
+      lower.includes('feature')
+    ) {
+      reply = `We provide end-to-end 24/7 AI receptionist services for your business: answering calls, capturing leads, and booking appointments automatically. Would you like to schedule a 15-minute demo?`;
+      triggeredTool = 'getBusinessInfo';
+    } else if (
+      lower.includes('my name is') ||
+      lower.includes('@') ||
+      lower.includes('phone') ||
+      lower.includes('email')
+    ) {
+      reply = `Thank you so much! I have securely recorded your information in our system. One of our specialists will follow up with full details shortly.`;
+      triggeredTool = 'createLead';
+    } else if (
+      lower.includes('hello') ||
+      lower.includes('hi') ||
+      lower.includes('hey')
+    ) {
+      reply = `Hello! Thank you for calling VEDANCO AI. My name is ${agentName}, your AI Receptionist. How may I assist your business today?`;
+    } else {
+      reply = `Thank you for asking about that. Based on our company guidelines, our team handles this with dedicated priority. Would you like me to book a quick discovery call, or would you prefer I connect you directly with a representative?`;
+    }
+  }
+
+  return { reply, triggeredTool };
+}
+
 // Fallback dispatcher for when backend is offline, unreachable, or running on static hosting (e.g. Vercel)
 function resolveOfflineFallback(config) {
   let url = (config.url || '').trim();
@@ -138,7 +280,16 @@ function resolveOfflineFallback(config) {
   // 7. Agents
   if (pathOnly.startsWith('/agents')) {
     if (pathOnly.includes('/sandbox/test')) {
-      return { success: true, reply: 'Hello! I am Sarah, your AI Receptionist. How can I assist you today?' };
+      const generated = generateSmartAIResponse(bodyData);
+      return {
+        success: true,
+        reply: generated.reply,
+        data: {
+          role: 'assistant',
+          content: generated.reply,
+          triggeredTool: generated.triggeredTool,
+        },
+      };
     }
     if (pathOnly.includes('/scrape-website')) {
       return { success: true, summary: 'Business information extracted successfully.', facts: [] };
@@ -701,7 +852,14 @@ function resolveOfflineFallback(config) {
       return { success: true, message: 'Demo booked successfully' };
     }
     if (pathOnly.includes('/voice-turn')) {
-      return { success: true, reply: 'Thank you for reaching out to VEDANCO AI. How may I direct your call?' };
+      const generated = generateSmartAIResponse(bodyData);
+      return {
+        success: true,
+        reply: generated.reply,
+        content: generated.reply,
+        role: 'assistant',
+        triggeredTool: generated.triggeredTool,
+      };
     }
     return { success: true, message: 'Demo session active' };
   }

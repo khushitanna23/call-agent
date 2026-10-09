@@ -49,6 +49,7 @@ export const CreateAgentWizardPage = () => {
     name: 'Sarah',
     type: 'receptionist',
     industry: 'Real Estate',
+    language: 'english',
     voice: {
       gender: 'Female',
       style: 'Friendly',
@@ -93,7 +94,9 @@ export const CreateAgentWizardPage = () => {
     ],
   });
 
-  // Step 7: Test Conversation Sandbox
+  // Step 7: Test Conversation Sandbox & Dual-Language state
+  const [sandboxLanguage, setSandboxLanguage] = useState('english'); // 'english' | 'gujarati'
+  const [isSpeakingMessageIdx, setIsSpeakingMessageIdx] = useState(null);
   const [sandboxMessages, setSandboxMessages] = useState([
     {
       role: 'user',
@@ -187,12 +190,81 @@ export const CreateAgentWizardPage = () => {
     toast.info('Knowledge entry removed');
   };
 
-  // Step 7: Test AI in Sandbox
-  const handleTestMessage = async (e) => {
-    e?.preventDefault();
-    if (!inputTestMessage.trim()) return;
+  // Step 7: Dual-Language Test AI in Sandbox
+  const handleSandboxLanguageChange = (newLang) => {
+    setSandboxLanguage(newLang);
+    if (newLang === 'gujarati') {
+      setSandboxMessages([
+        {
+          role: 'user',
+          content: 'નમસ્તે, મારે તમારી સેવાઓ વિશે માહિતી જોઈએ છે.',
+        },
+        {
+          role: 'assistant',
+          content: `ચોક્કસ! મને તમને મદદ કરવામાં આનંદ થશે. અમે ${agentData.businessName || agentData.name} માટે સંપૂર્ણ બિઝનેસ કન્સલ્ટેશન, ગ્રાહક પૂછપરછ અને એપોઇન્ટમેન્ટ બુકિંગ સેવાઓ આપીએ છીએ. શું તમે વધુ માહિતી મેળવવા અથવા મુલાકાત શેડ્યૂલ કરવા માંગો છો?`,
+        },
+      ]);
+    } else {
+      setSandboxMessages([
+        {
+          role: 'user',
+          content: 'Hi, I want to know about your services.',
+        },
+        {
+          role: 'assistant',
+          content: `Sure! I'd be happy to help. We provide full-service property advisory, consultations, and verified market valuations for ${agentData.businessName || agentData.name}. Are you looking to buy, lease, or schedule a tour?`,
+        },
+      ]);
+    }
+  };
 
-    const userMsg = { role: 'user', content: inputTestMessage };
+  const handleSpeakSandboxMessage = (text, idx) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      if (isSpeakingMessageIdx === idx) {
+        setIsSpeakingMessageIdx(null);
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = sandboxLanguage === 'gujarati' ? 'gu-IN' : 'en-US';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.02;
+
+      try {
+        const voices = window.speechSynthesis.getVoices() || [];
+        if (sandboxLanguage === 'gujarati') {
+          const guVoice = voices.find(
+            (v) =>
+              v.lang?.includes('gu') ||
+              v.lang?.toLowerCase().includes('gu-in') ||
+              v.name?.toLowerCase().includes('gujarati')
+          );
+          if (guVoice) utterance.voice = guVoice;
+        } else {
+          const enVoice = voices.find(
+            (v) =>
+              v.lang?.includes('en') &&
+              (v.name?.includes('Natural') ||
+                v.name?.includes('Google') ||
+                v.name?.includes('Samantha'))
+          );
+          if (enVoice) utterance.voice = enVoice;
+        }
+      } catch (e) {}
+
+      utterance.onstart = () => setIsSpeakingMessageIdx(idx);
+      utterance.onend = () => setIsSpeakingMessageIdx(null);
+      utterance.onerror = () => setIsSpeakingMessageIdx(null);
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const handleTestMessage = async (e, customText) => {
+    e?.preventDefault();
+    const textToSend = customText || inputTestMessage;
+    if (!textToSend.trim()) return;
+
+    const userMsg = { role: 'user', content: textToSend };
     const updatedMessages = [...sandboxMessages, userMsg];
     setSandboxMessages(updatedMessages);
     setInputTestMessage('');
@@ -206,33 +278,80 @@ export const CreateAgentWizardPage = () => {
         personality: agentData.personality,
         systemInstructions: agentData.systemInstructions,
         actions: agentData.actions,
+        language: sandboxLanguage,
       }).catch(() => null);
 
-      if (res?.data?.content) {
-        setSandboxMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: res.data.content,
-            tool: res.data.triggeredTool,
-          },
-        ]);
-      } else {
-        // High fidelity simulated response
-        setSandboxMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content: `Thank you for asking! As the AI Receptionist for ${agentData.businessName || agentData.name}, I can assist you with that or schedule a consultation directly with our team.`,
-          },
-        ]);
+      let replyContent = res?.data?.content || res?.reply;
+      const isGu = sandboxLanguage === 'gujarati';
+
+      if (!replyContent) {
+        const lower = textToSend.toLowerCase();
+        if (isGu) {
+          if (
+            lower.includes('એપોઇન્ટમેન્ટ') ||
+            lower.includes('બુક') ||
+            lower.includes('સમય') ||
+            lower.includes('તારીખ') ||
+            lower.includes('મળવું')
+          ) {
+            replyContent = `હું તમારી એપોઇન્ટમેન્ટ બુક કરવામાં ચોક્કસ મદદ કરી શકું! અમારી પાસે આવતીકાલે સવારે 10:00 વાગ્યે અથવા બપોરે 2:30 વાગ્યે સ્લોટ ઉપલબ્ધ છે. તમને કયો સમય અનુકૂળ રહેશે?`;
+          } else if (
+            lower.includes('કિંમત') ||
+            lower.includes('ભાવ') ||
+            lower.includes('પ્લાન') ||
+            lower.includes('રૂપિયા') ||
+            lower.includes('ખર્ચ')
+          ) {
+            replyContent = `અમારા પ્લાન દર મહિને ફક્ત $99 થી શરૂ થાય છે જેમાં 300 મિનિટ મળે છે. શું તમે તમારા વ્યવસાય માટે પ્લાન વિગતો જાણવા માંગો છો?`;
+          } else if (
+            lower.includes('મેનેજર') ||
+            lower.includes('માણસ') ||
+            lower.includes('વાત') ||
+            lower.includes('કનેક્ટ')
+          ) {
+            replyContent = `ચોક્કસ, હું તમારો કોલ અમારા સિનિયર મેનેજર સાથે ટ્રાન્સફર કરી રહી છું. કૃપા કરીને થોડીવાર લાઇન પર રહો.`;
+          } else {
+            replyContent = `પૂછવા બદલ આભાર! ${agentData.businessName || agentData.name} ની AI સહાયક તરીકે, હું તમારી પૂછપરછમાં મદદ કરી શકું છું અથવા અમારા એક્સપર્ટ સાથે કન્સલ્ટેશન શેડ્યૂલ કરી શકું છું.`;
+          }
+        } else {
+          if (
+            lower.includes('appointment') ||
+            lower.includes('book') ||
+            lower.includes('schedule') ||
+            lower.includes('time')
+          ) {
+            replyContent = `I would be delighted to schedule a consultation with our team! I have available slots tomorrow at 10:00 AM or 2:30 PM. Which time works best for you?`;
+          } else if (
+            lower.includes('price') ||
+            lower.includes('cost') ||
+            lower.includes('plan')
+          ) {
+            replyContent = `Our starter plans begin at $99/month with 300 included voice minutes. Would you like me to share more details?`;
+          } else {
+            replyContent = `Thank you for asking! As the AI Receptionist for ${agentData.businessName || agentData.name}, I can assist you with that or schedule a consultation directly with our team.`;
+          }
+        }
       }
-    } catch (err) {
+
       setSandboxMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `I would be happy to help with your inquiry regarding ${agentData.industry} services. Would you like to schedule an appointment?`,
+          content: replyContent,
+          tool: res?.data?.triggeredTool,
+        },
+      ]);
+    } catch (err) {
+      const fallback =
+        sandboxLanguage === 'gujarati'
+          ? `હું ${agentData.industry} સેવાઓ માટે તમારી સહાયતા કરવા તૈયાર છું. શું તમે એપોઇન્ટમેન્ટ બુક કરવા માંગો છો?`
+          : `I would be happy to help with your inquiry regarding ${agentData.industry} services. Would you like to schedule an appointment?`;
+
+      setSandboxMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: fallback,
         },
       ]);
     } finally {
@@ -241,16 +360,7 @@ export const CreateAgentWizardPage = () => {
   };
 
   const handleClearConversation = () => {
-    setSandboxMessages([
-      {
-        role: 'user',
-        content: 'Hi, I want to know about your services.',
-      },
-      {
-        role: 'assistant',
-        content: "Sure! I'd be happy to help.",
-      },
-    ]);
+    handleSandboxLanguageChange(sandboxLanguage);
     toast.info('Test conversation cleared');
   };
 
@@ -464,6 +574,57 @@ export const CreateAgentWizardPage = () => {
                   >
                     <Volume2 className="w-5 h-5 mx-auto mb-1.5 text-brand-cyan" />
                     <span className="text-xs font-bold block">{style}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Primary Conversational Language: English vs Gujarati */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-2">
+                Primary Conversational Language *
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    id: 'english',
+                    label: 'English',
+                    flag: '🇺🇸',
+                    sub: 'Native US / Global English conversational speech',
+                  },
+                  {
+                    id: 'gujarati',
+                    label: 'ગુજરાતી (Gujarati)',
+                    flag: '🇮🇳',
+                    sub: 'શુદ્ધ ગુજરાતી પ્રાદેશિક વૉઇસ અને વાતચીત',
+                  },
+                ].map((lang) => (
+                  <button
+                    key={lang.id}
+                    type="button"
+                    onClick={() => {
+                      const nextLang = lang.id;
+                      setAgentData({
+                        ...agentData,
+                        language: nextLang,
+                        greetingMessage:
+                          nextLang === 'gujarati'
+                            ? `નમસ્તે! ${agentData.businessName || 'અમારી કંપની'} માં કૉલ કરવા બદલ આભાર. મારું નામ ${agentData.name} છે, તમારી AI રિસેપ્શનિસ્ટ. આજે હું તમારી શું સેવા કરી શકું?`
+                            : `Hello! Thank you for calling ${agentData.businessName || 'our company'}. My name is ${agentData.name}, your AI Receptionist. How may I assist you today?`,
+                      });
+                      handleSandboxLanguageChange(nextLang);
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${
+                      (agentData.language || 'english') === lang.id
+                        ? 'bg-brand-cyan/15 border-brand-cyan text-white shadow-glow'
+                        : 'bg-navy-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xl">{lang.flag}</span>
+                      <span className="text-sm font-bold text-white">{lang.label}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 block">{lang.sub}</span>
                   </button>
                 ))}
               </div>
@@ -820,10 +981,10 @@ export const CreateAgentWizardPage = () => {
           </div>
         )}
 
-        {/* STEP 7: TEST AI (Feature 4 Requirement) */}
+        {/* STEP 7: TEST AI (Feature 4 Requirement - Dual Language English & Gujarati) */}
         {currentStep === 7 && (
           <div className="space-y-6 animate-in fade-in">
-            <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h3 className="text-xl font-bold text-white">STEP 7 — TEST AI</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -831,14 +992,43 @@ export const CreateAgentWizardPage = () => {
                 </p>
               </div>
 
-              {/* Status Badge: Ready to Test */}
-              <Badge variant="emerald" size="sm">
-                <Sparkles className="w-3 h-3" /> Ready to Test
-              </Badge>
+              {/* Language Switcher & Ready Status */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center p-1 rounded-xl bg-navy-950 border border-slate-800 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => handleSandboxLanguageChange('english')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                      sandboxLanguage === 'english'
+                        ? 'bg-emerald-500 text-black shadow-md font-bold'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🇺🇸</span>
+                    <span>English</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSandboxLanguageChange('gujarati')}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                      sandboxLanguage === 'gujarati'
+                        ? 'bg-emerald-500 text-black shadow-md font-bold'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🇮🇳</span>
+                    <span>ગુજરાતી</span>
+                  </button>
+                </div>
+
+                <Badge variant="emerald" size="sm">
+                  <Sparkles className="w-3 h-3" /> Ready to Test
+                </Badge>
+              </div>
             </div>
 
             {/* AI Employee Information Overview */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-navy-900 border border-slate-800 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4 rounded-2xl bg-navy-900 border border-slate-800 text-xs">
               <div>
                 <span className="text-slate-400 text-[10px] uppercase block">AI Employee</span>
                 <span className="font-bold text-white mt-0.5 block">{agentData.name}</span>
@@ -854,6 +1044,13 @@ export const CreateAgentWizardPage = () => {
                 </span>
               </div>
               <div>
+                <span className="text-slate-400 text-[10px] uppercase block">Test Language</span>
+                <span className="font-bold text-emerald-400 mt-0.5 block flex items-center gap-1">
+                  <span>{sandboxLanguage === 'gujarati' ? '🇮🇳' : '🇺🇸'}</span>
+                  <span>{sandboxLanguage === 'gujarati' ? 'ગુજરાતી' : 'English'}</span>
+                </span>
+              </div>
+              <div>
                 <span className="text-slate-400 text-[10px] uppercase block">Knowledge &amp; Actions</span>
                 <span className="font-bold text-emerald-400 mt-0.5 block">
                   {agentData.knowledgeItems.length} Sources • {Object.values(agentData.actions).filter(Boolean).length} Actions
@@ -864,7 +1061,12 @@ export const CreateAgentWizardPage = () => {
             {/* Test Conversation Area */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-white">Test Conversation</span>
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>Test Conversation</span>
+                  <span className="text-[11px] font-normal text-slate-400">
+                    ({sandboxLanguage === 'gujarati' ? 'ગુજરાતી મોડ' : 'English Mode'})
+                  </span>
+                </span>
                 <button
                   type="button"
                   onClick={handleClearConversation}
@@ -898,14 +1100,61 @@ export const CreateAgentWizardPage = () => {
                           : 'bg-navy-800 text-slate-100 border border-slate-700/60'
                       }`}
                     >
-                      <span className="text-[10px] font-semibold text-slate-400 block mb-0.5">
-                        {msg.role === 'user' ? 'Customer:' : `${agentData.name} (AI):`}
-                      </span>
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <span className="text-[10px] font-semibold text-slate-400 block">
+                          {msg.role === 'user' ? 'Customer:' : `${agentData.name} (AI):`}
+                        </span>
+                        {msg.role === 'assistant' && (
+                          <button
+                            type="button"
+                            onClick={() => handleSpeakSandboxMessage(msg.content, i)}
+                            className={`p-1 rounded-md text-[10px] flex items-center gap-1 transition ${
+                              isSpeakingMessageIdx === i
+                                ? 'bg-emerald-500/20 text-emerald-400 animate-pulse'
+                                : 'text-slate-400 hover:text-white hover:bg-white/10'
+                            }`}
+                            title="Listen to AI Voice"
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                            <span>{isSpeakingMessageIdx === i ? 'Speaking...' : 'Listen'}</span>
+                          </button>
+                        )}
+                      </div>
                       <p>{msg.content}</p>
                     </div>
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Quick Test Prompt Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider shrink-0">
+                {sandboxLanguage === 'gujarati' ? 'ઝડપી પ્રશ્ન:' : 'Quick Test:'}
+              </span>
+              {(sandboxLanguage === 'gujarati'
+                ? [
+                    'સેવાઓ વિશે જણાવો',
+                    'એપોઇન્ટમેન્ટ બુક કરવી છે',
+                    'ઓફિસનો સમય શું છે?',
+                    'કિંમત કેટલી છે?',
+                  ]
+                : [
+                    'Tell me about your services',
+                    'I want to book an appointment',
+                    'What are your hours?',
+                    'What is the pricing?',
+                  ]
+              ).map((chip, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleTestMessage(null, chip)}
+                  className="px-2.5 py-1 rounded-lg bg-navy-900 hover:bg-emerald-500/15 border border-slate-800 hover:border-emerald-500/40 text-[11px] text-slate-300 hover:text-emerald-300 transition whitespace-nowrap shrink-0"
+                >
+                  {chip}
+                </button>
+              ))}
             </div>
 
             {/* Message input + Send button */}
@@ -914,11 +1163,15 @@ export const CreateAgentWizardPage = () => {
                 type="text"
                 value={inputTestMessage}
                 onChange={(e) => setInputTestMessage(e.target.value)}
-                placeholder="Type customer message: e.g. What are your hours? Can I book a tour?"
+                placeholder={
+                  sandboxLanguage === 'gujarati'
+                    ? 'ગ્રાહકનો પ્રશ્ન લખો: દા.ત. તમારી સેવાઓ શું છે? શું હું એપોઇન્ટમેન્ટ બુક કરી શકું?'
+                    : 'Type customer message: e.g. What are your hours? Can I book a tour?'
+                }
                 className="flex-1 bg-navy-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-brand-cyan"
               />
               <Button type="submit" variant="primary" size="md" isLoading={isTesting}>
-                <Send className="w-4 h-4" /> Send
+                <Send className="w-4 h-4" /> {sandboxLanguage === 'gujarati' ? 'મોકલો' : 'Send'}
               </Button>
             </form>
           </div>
