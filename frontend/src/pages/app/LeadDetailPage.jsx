@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   User,
@@ -28,6 +28,8 @@ import api from '../../api/client';
 
 export const LeadDetailPage = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
   const [leadData, setLeadData] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -122,7 +124,7 @@ export const LeadDetailPage = () => {
       <div className="py-24 text-center">
         <h2 className="text-xl font-bold text-white mb-2">Lead Record Not Found</h2>
         <p className="text-xs text-slate-400 mb-4">The requested lead does not exist or has been deleted.</p>
-        <Link to="/app/leads">
+        <Link to={`${basePath}/leads`}>
           <Button variant="secondary" size="sm">
             Return to CRM Pipeline
           </Button>
@@ -136,7 +138,7 @@ export const LeadDetailPage = () => {
       {/* Back button */}
       <div>
         <Link
-          to="/app/leads"
+          to={`${basePath}/leads`}
           className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-emerald-400 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Back to CRM Pipeline
@@ -365,7 +367,7 @@ export const LeadDetailPage = () => {
 
               <div className="mt-4 pt-3 border-t border-slate-800">
                 <Link
-                  to="/app/appointments"
+                  to={`${basePath}/appointments`}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-cyan hover:underline"
                 >
                   Manage Appointments <ExternalLink className="w-3.5 h-3.5" />

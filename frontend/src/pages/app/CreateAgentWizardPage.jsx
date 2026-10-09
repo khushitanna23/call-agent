@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Bot,
   Globe,
@@ -108,6 +108,8 @@ export const CreateAgentWizardPage = () => {
 
   const toast = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
 
   // Exactly matching Feature 1 Step 2
   const industries = [
@@ -1031,14 +1033,14 @@ export const CreateAgentWizardPage = () => {
                   <Button
                     variant="secondary"
                     size="md"
-                    onClick={() => navigate('/app/agents')}
+                    onClick={() => navigate(`${basePath}/agents`)}
                   >
                     View All Agents
                   </Button>
                   <Button
                     variant="primary"
                     size="md"
-                    onClick={() => navigate('/app/dashboard')}
+                    onClick={() => navigate(`${basePath}/dashboard`)}
                   >
                     Go to Dashboard
                   </Button>

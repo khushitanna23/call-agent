@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
   PhoneCall,
@@ -28,6 +28,8 @@ import api from '../../api/client';
 
 export const CallDetailPage = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
   const [callData, setCallData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [transcriptSearch, setTranscriptSearch] = useState('');
@@ -109,7 +111,7 @@ export const CallDetailPage = () => {
     return (
       <div className="py-24 text-center space-y-4">
         <p className="text-slate-400">Call record not found.</p>
-        <Link to="/app/calls">
+        <Link to={`${basePath}/calls`}>
           <Button variant="secondary" size="sm">
             Back to Calls
           </Button>
@@ -130,7 +132,7 @@ export const CallDetailPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
-            to="/app/calls"
+            to={`${basePath}/calls`}
             className="p-2 rounded-xl bg-navy-900 border border-slate-800 text-slate-400 hover:text-white transition"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -319,7 +321,7 @@ export const CallDetailPage = () => {
               subtitle="Scheduled consultation details"
               action={
                 <Link
-                  to="/app/appointments"
+                  to={`${basePath}/appointments`}
                   className="text-xs text-brand-cyan hover:underline font-semibold"
                 >
                   Calendar

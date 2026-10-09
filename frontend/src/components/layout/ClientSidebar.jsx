@@ -1,70 +1,15 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Bot,
-  PlusCircle,
-  PhoneCall,
-  Users,
-  Calendar,
-  BookOpen,
-  Send,
-  Zap,
-  Boxes,
-  BarChart3,
-  CreditCard,
-  Settings,
-  Shield,
-  Headphones,
-  Sparkles,
-} from 'lucide-react';
+import { Bot, Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../common/Badge';
+import { getNavSections } from '../../config/navigation';
 
 export const ClientSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
   const { user, organization, isAdmin } = useAuth();
   const location = useLocation();
 
-  const navSections = [
-    {
-      group: 'Overview',
-      items: [
-        { label: 'Dashboard', icon: LayoutDashboard, path: '/client/dashboard' },
-      ],
-    },
-    {
-      group: 'AI Employees',
-      items: [
-        { label: 'My Agents', icon: Bot, path: '/client/agents' },
-        { label: 'Create Agent', icon: PlusCircle, path: '/client/agents/new', badge: 'Wizard' },
-      ],
-    },
-    {
-      group: 'Communications',
-      items: [
-        { label: 'Calls & Transcripts', icon: PhoneCall, path: '/client/calls' },
-        { label: 'Leads CRM', icon: Users, path: '/client/leads' },
-        { label: 'Appointments', icon: Calendar, path: '/client/appointments' },
-        { label: 'Knowledge Base', icon: BookOpen, path: '/client/knowledge' },
-      ],
-    },
-    {
-      group: 'Operations',
-      items: [
-        { label: 'Campaigns', icon: Send, path: '/client/campaigns' },
-        { label: 'Automations', icon: Zap, path: '/client/automations' },
-        { label: 'Integrations', icon: Boxes, path: '/client/integrations' },
-        { label: 'Analytics', icon: BarChart3, path: '/client/analytics' },
-      ],
-    },
-    {
-      group: 'Account',
-      items: [
-        { label: 'Billing & Plans', icon: CreditCard, path: '/client/billing' },
-        { label: 'Settings', icon: Settings, path: '/client/settings' },
-      ],
-    },
-  ];
+  const navSections = getNavSections('client');
 
   return (
     <>
@@ -111,7 +56,11 @@ export const ClientSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIs
                 </div>
               )}
               {section.items.map((item) => {
-                const isActive = location.pathname === item.path || (item.path !== '/client/dashboard' && location.pathname.startsWith(item.path));
+                const isActive =
+                  location.pathname === item.path ||
+                  (item.path !== '/client/dashboard' &&
+                    item.path !== '/client/agents/new' &&
+                    location.pathname.startsWith(item.path));
                 const Icon = item.icon;
                 return (
                   <NavLink
@@ -144,14 +93,14 @@ export const ClientSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIs
             </div>
           ))}
 
-          {/* Switch to Admin Cockpit if user is admin or direct Admin Sign-In */}
-          <div className="pt-4 border-t border-emerald-950/60">
-            {!isCollapsed && (
-              <div className="px-3 text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-2">
-                Platform Admin
-              </div>
-            )}
-            {isAdmin ? (
+          {/* Platform Admin link if user is administrator */}
+          {isAdmin && (
+            <div className="pt-4 border-t border-emerald-950/60">
+              {!isCollapsed && (
+                <div className="px-3 text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-2">
+                  Platform Admin
+                </div>
+              )}
               <NavLink
                 to="/admin/dashboard"
                 onClick={() => setIsMobileOpen(false)}
@@ -162,21 +111,10 @@ export const ClientSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIs
                 {!isCollapsed && (
                   <span className="truncate flex-1 font-semibold">Agency Cockpit</span>
                 )}
+                {!isCollapsed && <ArrowRight className="w-3.5 h-3.5 ml-auto text-amber-400" />}
               </NavLink>
-            ) : (
-              <NavLink
-                to="/login?role=admin"
-                onClick={() => setIsMobileOpen(false)}
-                title={isCollapsed ? 'Admin Portal Sign-In' : undefined}
-                className="flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium transition-all group bg-amber-500/5 text-amber-400/90 hover:bg-amber-500/15 border border-amber-500/20"
-              >
-                <Shield className="w-3.5 h-3.5 shrink-0 text-amber-400" />
-                {!isCollapsed && (
-                  <span className="truncate flex-1 font-semibold">Admin Portal (Google)</span>
-                )}
-              </NavLink>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Organization Voice Minute Usage Summary at bottom */}
@@ -185,7 +123,7 @@ export const ClientSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIs
             <div className="flex items-center justify-between text-xs text-gray-300 mb-1.5">
               <span>Voice Minutes</span>
               <span className="font-mono text-emerald-400 font-semibold">
-                {organization?.minutesUsed || 0} / {organization?.minutesAllowance || 1000}
+                {organization?.minutesUsed || 142} / {organization?.minutesAllowance || 1000}
               </span>
             </div>
             <div className="w-full bg-[#121215] h-1.5 rounded-full overflow-hidden border border-emerald-950/80">
@@ -195,7 +133,7 @@ export const ClientSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIs
                   width: `${Math.min(
                     100,
                     Math.round(
-                      ((organization?.minutesUsed || 0) / (organization?.minutesAllowance || 1000)) * 100
+                      ((organization?.minutesUsed || 142) / (organization?.minutesAllowance || 1000)) * 100
                     )
                   )}%`,
                 }}

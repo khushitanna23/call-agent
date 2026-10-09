@@ -17,7 +17,7 @@ import { LoginPage } from '../pages/public/LoginPage';
 import { SignupPage } from '../pages/public/SignupPage';
 import { BookAppointmentPage } from '../pages/public/BookAppointmentPage';
 
-// Client & SaaS Pages
+// Canonical Shared Modules
 import { DashboardPage } from '../pages/app/DashboardPage';
 import { AgentsPage } from '../pages/app/AgentsPage';
 import { CreateAgentWizardPage } from '../pages/app/CreateAgentWizardPage';
@@ -30,17 +30,14 @@ import { KnowledgePage } from '../pages/app/KnowledgePage';
 import { CampaignsPage } from '../pages/app/CampaignsPage';
 import { AutomationsPage } from '../pages/app/AutomationsPage';
 import { IntegrationsPage } from '../pages/app/IntegrationsPage';
+import { PhoneNumbersPage } from '../pages/app/PhoneNumbersPage';
 import { AnalyticsPage } from '../pages/app/AnalyticsPage';
+import { ClientManagementPage } from '../pages/app/ClientManagementPage';
 import { BillingPage } from '../pages/app/BillingPage';
 import { SettingsPage } from '../pages/app/SettingsPage';
 
-// Admin & Agency Pages
+// Admin Dedicated Dashboard
 import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
-import { AdminClientsPage } from '../pages/admin/AdminClientsPage';
-import { AdminWhiteLabelPage } from '../pages/admin/AdminWhiteLabelPage';
-import { AdminTelephonyPage } from '../pages/admin/AdminTelephonyPage';
-import { AdminBillingMarkupPage } from '../pages/admin/AdminBillingMarkupPage';
-import { AdminAppointmentsPage } from '../pages/admin/AdminAppointmentsPage';
 
 // Smart Redirect Handlers
 const DashboardRedirect = () => {
@@ -103,7 +100,7 @@ export const AppRoutes = () => {
         }
       />
 
-      {/* CLIENT WORKSPACE EXPERIENCE (/client/* and /app/*) */}
+      {/* CLIENT WORKSPACE EXPERIENCE (/client/*) */}
       <Route
         path="/client"
         element={
@@ -126,34 +123,10 @@ export const AppRoutes = () => {
         <Route path="campaigns" element={<CampaignsPage />} />
         <Route path="automations" element={<AutomationsPage />} />
         <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="phone-numbers" element={<PhoneNumbersPage />} />
+        <Route path="telephony" element={<Navigate to="/client/phone-numbers" replace />} />
         <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="billing" element={<BillingPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-      </Route>
-
-      <Route
-        path="/app"
-        element={
-          <ClientRoute>
-            <ClientLayout />
-          </ClientRoute>
-        }
-      >
-        <Route index element={<Navigate to="/app/dashboard" replace />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="agents" element={<AgentsPage />} />
-        <Route path="agents/new" element={<CreateAgentWizardPage />} />
-        <Route path="calls" element={<CallsPage />} />
-        <Route path="calls/:id" element={<CallDetailPage />} />
-        <Route path="leads" element={<LeadsPage />} />
-        <Route path="leads/:id" element={<LeadDetailPage />} />
-        <Route path="appointments" element={<AppointmentsPage />} />
-        <Route path="book" element={<BookAppointmentPage />} />
-        <Route path="knowledge" element={<KnowledgePage />} />
-        <Route path="campaigns" element={<CampaignsPage />} />
-        <Route path="automations" element={<AutomationsPage />} />
-        <Route path="integrations" element={<IntegrationsPage />} />
-        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="clients" element={<ClientManagementPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
@@ -169,19 +142,30 @@ export const AppRoutes = () => {
       >
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard" element={<AdminDashboardPage />} />
-        <Route path="clients" element={<AdminClientsPage />} />
-        <Route path="whitelabel" element={<AdminWhiteLabelPage />} />
-        <Route path="telephony" element={<AdminTelephonyPage />} />
-        <Route path="billing" element={<AdminBillingMarkupPage />} />
         <Route path="agents" element={<AgentsPage />} />
+        <Route path="agents/new" element={<CreateAgentWizardPage />} />
         <Route path="calls" element={<CallsPage />} />
         <Route path="calls/:id" element={<CallDetailPage />} />
         <Route path="leads" element={<LeadsPage />} />
         <Route path="leads/:id" element={<LeadDetailPage />} />
-        <Route path="appointments" element={<AdminAppointmentsPage />} />
+        <Route path="appointments" element={<AppointmentsPage />} />
+        <Route path="knowledge" element={<KnowledgePage />} />
+        <Route path="campaigns" element={<CampaignsPage />} />
+        <Route path="automations" element={<AutomationsPage />} />
+        <Route path="integrations" element={<IntegrationsPage />} />
+        <Route path="phone-numbers" element={<PhoneNumbersPage />} />
+        <Route path="telephony" element={<Navigate to="/admin/phone-numbers" replace />} />
+        <Route path="analytics" element={<AnalyticsPage />} />
+        <Route path="clients" element={<ClientManagementPage />} />
+        <Route path="billing" element={<BillingPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="whitelabel" element={<Navigate to="/admin/settings?tab=whitelabel" replace />} />
         <Route path="logs" element={<AdminDashboardPage initialTab="logs" />} />
-        <Route path="settings" element={<AdminDashboardPage initialTab="settings" />} />
       </Route>
+
+      {/* Universal Legacy /app/* handler */}
+      <Route path="/app/*" element={<LegacyAppRedirect />} />
+      <Route path="/app" element={<LegacyAppRedirect />} />
 
       {/* 404 Catch All */}
       <Route path="*" element={<Navigate to="/" replace />} />

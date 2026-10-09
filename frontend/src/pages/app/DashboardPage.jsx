@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext, useLocation } from 'react-router-dom';
 import {
   PhoneCall,
   CheckCircle2,
@@ -35,6 +35,8 @@ import api from '../../api/client';
 
 export const DashboardPage = () => {
   const { user, organization } = useAuth();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
   const { agentOnline, onOpenVoiceDemo } = useOutletContext() || {};
   const toast = useToast();
 
@@ -141,7 +143,7 @@ export const DashboardPage = () => {
             Refresh
           </Button>
 
-          <Link to="/app/appointments?book=true">
+          <Link to={`${basePath}/appointments?book=true`}>
             <Button
               variant="secondary"
               size="sm"
@@ -225,7 +227,7 @@ export const DashboardPage = () => {
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-slate-400 block font-medium">Minutes Used</span>
                 <Link
-                  to="/app/billing"
+                  to={`${basePath}/billing`}
                   className="text-[10px] text-brand-cyan hover:underline font-semibold"
                 >
                   + Refill
@@ -389,7 +391,7 @@ export const DashboardPage = () => {
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> AI Resolved
                 </span>
               </div>
-              <Link to="/app/analytics" className="text-brand-cyan hover:underline flex items-center gap-1">
+              <Link to={`${basePath}/analytics`} className="text-brand-cyan hover:underline flex items-center gap-1">
                 Full Metrics <ArrowUpRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -403,7 +405,7 @@ export const DashboardPage = () => {
               title="Upcoming Appointments"
               subtitle="Confirmed consultations scheduled by AI"
               action={
-                <Link to="/app/appointments" className="text-xs text-brand-cyan hover:underline">
+                <Link to={`${basePath}/appointments`} className="text-xs text-brand-cyan hover:underline">
                   View All
                 </Link>
               }
@@ -444,7 +446,7 @@ export const DashboardPage = () => {
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-800/80">
-              <Link to="/app/appointments">
+              <Link to={`${basePath}/appointments`}>
                 <Button variant="outline" size="sm" className="w-full">
                   Manage Calendar Slots
                 </Button>
@@ -463,7 +465,7 @@ export const DashboardPage = () => {
               title="Recent Inbound Calls"
               subtitle="Latest recordings, transcripts, and AI qualification outcomes"
               action={
-                <Link to="/app/calls" className="text-xs text-brand-cyan hover:underline flex items-center gap-1">
+                <Link to={`${basePath}/calls`} className="text-xs text-brand-cyan hover:underline flex items-center gap-1">
                   View All Calls <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               }
@@ -535,7 +537,7 @@ export const DashboardPage = () => {
               title="Recent Qualified Leads"
               subtitle="Automatically scored by AI Receptionist"
               action={
-                <Link to="/app/leads" className="text-xs text-brand-cyan hover:underline">
+                <Link to={`${basePath}/leads`} className="text-xs text-brand-cyan hover:underline">
                   CRM Pipeline
                 </Link>
               }

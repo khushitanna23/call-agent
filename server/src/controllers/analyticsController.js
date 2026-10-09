@@ -11,7 +11,9 @@ exports.getAnalytics = async (req, res, next) => {
   try {
     const { timeRange = '30d' } = req.query;
 
-    const organizationId = req.organizationId;
+    const isAgencyAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin' || req.user?.role === 'agency_admin';
+    const filterOrgId = req.query.organizationId;
+
     const now = new Date();
     let startDate = new Date();
 
@@ -25,16 +27,25 @@ exports.getAnalytics = async (req, res, next) => {
     }
 
     const query = {
-      organizationId,
       createdAt: { $gte: startDate },
     };
+
+    let agentQuery = {};
+
+    if (!isAgencyAdmin) {
+      query.organizationId = req.organizationId;
+      agentQuery.organizationId = req.organizationId;
+    } else if (filterOrgId && filterOrgId !== 'all') {
+      query.organizationId = filterOrgId;
+      agentQuery.organizationId = filterOrgId;
+    }
 
     // Parallel fetch for speed
     const [calls, leads, appointments, agents] = await Promise.all([
       Call.find(query),
       Lead.find(query),
       Appointment.find(query),
-      Agent.find({ organizationId }),
+      Agent.find(agentQuery),
     ]);
 
     const totalCalls = calls.length;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Users,
   Search,
@@ -15,27 +15,50 @@ import {
   Target,
   Sparkles,
   Calendar,
+  Building2,
 } from 'lucide-react';
 import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 import { io } from 'socket.io-client';
 
 export const LeadsPage = () => {
+  const { isAdmin } = useAuth();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
+
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' or 'table'
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
+  const [clientsList, setClientsList] = useState([]);
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
   const [selectedLead, setSelectedLead] = useState(null);
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
   const [stageCounts, setStageCounts] = useState({});
   const [newLeadModalOpen, setNewLeadModalOpen] = useState(false);
   const [draggingLeadId, setDraggingLeadId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchClients();
+    }
+  }, [isAdmin]);
+
+  const fetchClients = async () => {
+    try {
+      const res = await api.get('/admin/clients');
+      if (res?.data) {
+        setClientsList(res.data);
+      }
+    } catch {}
+  };
 
   // New lead form
   const [newLeadData, setNewLeadData] = useState({
@@ -78,12 +101,15 @@ export const LeadsPage = () => {
     return () => {
       socket.disconnect();
     };
-  }, [stageFilter]);
+  }, [stageFilter, selectedOrgFilter]);
 
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const url = `/leads?stage=${stageFilter}${search ? `&search=${search}` : ''}`;
+      let url = `/leads?stage=${stageFilter}${search ? `&search=${search}` : ''}`;
+      if (isAdmin && selectedOrgFilter !== 'all') {
+        url += `&organizationId=${selectedOrgFilter}`;
+      }
       const res = await api.get(url);
       if (res.data) setLeads(res.data);
       if (res.stageCounts) setStageCounts(res.stageCounts);
@@ -154,6 +180,25 @@ export const LeadsPage = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#121215] border border-emerald-500/30 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-gray-400 hidden sm:inline">Workspace:</span>
+              <select
+                value={selectedOrgFilter}
+                onChange={(e) => setSelectedOrgFilter(e.target.value)}
+                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="all" className="bg-[#121215] text-white">All Workspaces (Platform-wide)</option>
+                {clientsList.map((client) => (
+                  <option key={client.id || client._id} value={client.id || client._id} className="bg-[#121215] text-white">
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* View mode toggle */}
           <div className="flex items-center p-1 rounded-xl bg-[#0c0c0e] border border-emerald-950/80 shadow-xs">
             <button
@@ -404,7 +449,7 @@ export const LeadsPage = () => {
                           Quick View
                         </button>
                         <Link
-                          to={`/app/leads/${l._id}`}
+                          to={`${basePath}/leads/${l._id}`}
                           className="px-2.5 py-1 rounded-lg bg-cyan-500/10 text-brand-cyan hover:bg-cyan-500/20 border border-cyan-500/30 transition font-semibold inline-flex items-center gap-1"
                         >
                           Detail <ChevronRight className="w-3.5 h-3.5" />
@@ -495,7 +540,7 @@ export const LeadsPage = () => {
             {/* Link to Full Page */}
             <div className="pt-2 flex justify-end">
               <Link
-                to={`/app/leads/${selectedLead._id}`}
+                to={`${basePath}/leads/${selectedLead._id}`}
                 className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-brand-cyan to-brand-indigo hover:from-cyan-400 hover:to-indigo-500 text-white shadow-glow transition inline-flex items-center gap-1.5"
               >
                 Open Full Lead Dossier <ChevronRight className="w-4 h-4" />

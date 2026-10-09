@@ -750,8 +750,14 @@ exports.downloadIcs = async (req, res, next) => {
  */
 exports.getAppointments = async (req, res, next) => {
   try {
-    const { status, date, search } = req.query;
-    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
+    const isAgencyAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin' || req.user?.role === 'agency_admin';
+    const { status, date, search, organizationId } = req.query;
+    const query = {};
+    if (!isAgencyAdmin) {
+      query.organizationId = req.organizationId;
+    } else if (organizationId && organizationId !== 'all') {
+      query.organizationId = organizationId;
+    }
 
     if (status && status !== 'all') {
       query.status = status;

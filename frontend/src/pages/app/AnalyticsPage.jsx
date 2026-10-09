@@ -33,22 +33,46 @@ import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
+import { Building2 } from 'lucide-react';
 import api from '../../api/client';
 
 export const AnalyticsPage = () => {
+  const { isAdmin } = useAuth();
   const [timeRange, setTimeRange] = useState('30d');
+  const [clientsList, setClientsList] = useState([]);
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
   useEffect(() => {
+    if (isAdmin) {
+      fetchClients();
+    }
+  }, [isAdmin]);
+
+  const fetchClients = async () => {
+    try {
+      const res = await api.get('/admin/clients');
+      if (res?.data) {
+        setClientsList(res.data);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
     fetchAnalytics();
-  }, [timeRange]);
+  }, [timeRange, selectedOrgFilter]);
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/analytics?timeRange=${timeRange}`);
+      let url = `/analytics?timeRange=${timeRange}`;
+      if (isAdmin && selectedOrgFilter !== 'all') {
+        url += `&organizationId=${selectedOrgFilter}`;
+      }
+      const res = await api.get(url);
       if (res.metrics) setData(res);
     } catch (err) {
       toast.error('Failed to load analytics');
@@ -112,8 +136,27 @@ export const AnalyticsPage = () => {
           </p>
         </div>
 
-        {/* Time filters */}
-        <div className="flex items-center gap-2">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#121215] border border-emerald-500/30 text-xs mr-1">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-gray-400 hidden sm:inline">Workspace:</span>
+              <select
+                value={selectedOrgFilter}
+                onChange={(e) => setSelectedOrgFilter(e.target.value)}
+                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="all" className="bg-[#121215] text-white">All Workspaces (Platform-wide)</option>
+                {clientsList.map((client) => (
+                  <option key={client.id || client._id} value={client.id || client._id} className="bg-[#121215] text-white">
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {['today', '7d', '30d'].map((r) => (
             <button
               key={r}

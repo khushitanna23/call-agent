@@ -1,70 +1,15 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Bot,
-  PlusCircle,
-  PhoneCall,
-  Users,
-  Calendar,
-  BookOpen,
-  Send,
-  Zap,
-  Boxes,
-  BarChart3,
-  CreditCard,
-  Settings,
-  ShieldAlert,
-  ChevronRight,
-  Headphones,
-} from 'lucide-react';
+import { Bot, ShieldAlert, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../common/Badge';
+import { getNavSections } from '../../config/navigation';
 
 export const AppSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
   const { user, organization, isAdmin } = useAuth();
   const location = useLocation();
 
-  const navSections = [
-    {
-      group: 'Overview',
-      items: [
-        { label: 'Dashboard', icon: LayoutDashboard, path: '/client/dashboard' },
-      ],
-    },
-    {
-      group: 'AI Employees',
-      items: [
-        { label: 'My Agents', icon: Bot, path: '/client/agents' },
-        { label: 'Create Agent', icon: PlusCircle, path: '/client/agents/new', badge: 'Wizard' },
-      ],
-    },
-    {
-      group: 'Communications',
-      items: [
-        { label: 'Calls & Transcripts', icon: PhoneCall, path: '/client/calls' },
-        { label: 'Leads CRM', icon: Users, path: '/client/leads' },
-        { label: 'Appointments', icon: Calendar, path: '/client/appointments' },
-        { label: 'Knowledge Base', icon: BookOpen, path: '/client/knowledge' },
-      ],
-    },
-    {
-      group: 'Operations',
-      items: [
-        { label: 'Campaigns', icon: Send, path: '/client/campaigns' },
-        { label: 'Automations', icon: Zap, path: '/client/automations' },
-        { label: 'Integrations', icon: Boxes, path: '/client/integrations' },
-        { label: 'Analytics', icon: BarChart3, path: '/client/analytics' },
-      ],
-    },
-    {
-      group: 'Account',
-      items: [
-        { label: 'Billing & Plans', icon: CreditCard, path: '/client/billing' },
-        { label: 'Settings', icon: Settings, path: '/client/settings' },
-      ],
-    },
-  ];
+  const navSections = getNavSections('client');
 
   return (
     <>
@@ -111,7 +56,11 @@ export const AppSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMob
                 </div>
               )}
               {section.items.map((item) => {
-                const isActive = location.pathname === item.path;
+                const isActive =
+                  location.pathname === item.path ||
+                  (item.path !== '/client/dashboard' &&
+                    item.path !== '/client/agents/new' &&
+                    location.pathname.startsWith(item.path));
                 const Icon = item.icon;
                 return (
                   <NavLink
@@ -156,14 +105,11 @@ export const AppSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMob
                 to="/admin/dashboard"
                 onClick={() => setIsMobileOpen(false)}
                 title={isCollapsed ? 'Admin Super Panel' : undefined}
-                className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group ${
-                  location.pathname.startsWith('/admin')
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                    : 'text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10'
-                }`}
+                className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all group bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 border border-amber-500/30"
               >
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                {!isCollapsed && <span className="truncate flex-1">Admin Portal</span>}
+                <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
+                {!isCollapsed && <span className="truncate flex-1 font-semibold">Admin Portal</span>}
+                {!isCollapsed && <ArrowRight className="w-3.5 h-3.5 ml-auto text-amber-400" />}
               </NavLink>
             </div>
           )}

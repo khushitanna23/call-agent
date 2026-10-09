@@ -19,19 +19,27 @@ import {
   AlertCircle,
   Edit2,
   Bot,
+  Building,
+  PhoneCall,
+  Play,
 } from 'lucide-react';
 import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 import { io } from 'socket.io-client';
 
 export const AppointmentsPage = () => {
+  const { user, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   const [appointments, setAppointments] = useState([]);
   const [agents, setAgents] = useState([]);
+  const [clientsList, setClientsList] = useState([]);
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
+  const [triggeringId, setTriggeringId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [activeTab, setActiveTab] = useState('upcoming'); // 'all', 'upcoming', 'confirmed', 'completed', 'rescheduled', 'cancelled'
@@ -66,6 +74,9 @@ export const AppointmentsPage = () => {
   useEffect(() => {
     fetchAppointments();
     fetchAgents();
+    if (isAdmin) {
+      fetchClients();
+    }
 
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || window.location.origin;
     const socket = io(socketUrl, {
@@ -74,7 +85,16 @@ export const AppointmentsPage = () => {
 
     const orgId = localStorage.getItem('vedanco_org_id');
     socket.on('connect', () => {
+      if (isAdmin) socket.emit('join_admin');
       if (orgId) socket.emit('join_org', orgId);
+    });
+
+    socket.on('admin_appointment_booked', (payload) => {
+      const name = payload.appointment?.callerName || payload.appointment?.customerName || 'Inbound Caller';
+      const time = payload.appointment?.scheduledTime || payload.appointment?.timeSlot || 'Scheduled';
+      const org = payload.organization?.name || 'Client Workspace';
+      toast.success(`🚨 New Appointment Booked: ${name} (${time}) · ${org}`);
+      fetchAppointments();
     });
 
     socket.on('appointment_booked', (payload) => {
@@ -94,7 +114,30 @@ export const AppointmentsPage = () => {
       socket.disconnect();
       clearInterval(timer);
     };
-  }, []);
+  }, [isAdmin, selectedOrgFilter]);
+
+  const fetchClients = async () => {
+    try {
+      const res = await api.get('/admin/clients');
+      if (res?.data) setClientsList(res.data);
+    } catch {}
+  };
+
+  const handleTriggerCall = async (apptId) => {
+    try {
+      setTriggeringId(apptId);
+      toast.info('Initiating automated AI outbound phone call to customer...');
+      const res = await api.post(`/appointments/${apptId}/trigger-call`);
+      if (res?.success) {
+        toast.success(res.message || 'Outbound AI call placed successfully via carrier!');
+        fetchAppointments();
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Failed to place call');
+    } finally {
+      setTriggeringId(null);
+    }
+  };
 
   useEffect(() => {
     // Detect context from URL query params (e.g. ?book=true&agentId=...)
@@ -136,7 +179,10 @@ export const AppointmentsPage = () => {
   const fetchAppointments = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/appointments');
+      const url =
+        '/appointments' +
+        (isAdmin && selectedOrgFilter !== 'all' ? `?organizationId=${selectedOrgFilter}` : '');
+      const res = await api.get(url);
       if (res.data) setAppointments(res.data);
       if (res.counts) setCounts(res.counts);
     } catch (err) {
@@ -374,6 +420,21 @@ export const AppointmentsPage = () => {
             </button>
           </div>
 
+          {isAdmin && (
+            <select
+              value={selectedOrgFilter}
+              onChange={(e) => setSelectedOrgFilter(e.target.value)}
+              className="bg-[#121215] border border-amber-500/30 text-amber-400 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none"
+            >
+              <option value="all">All Workspaces</option>
+              {clientsList.map((c) => (
+                <option key={c.id || c._id} value={c.id || c._id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <Button variant="outline" size="sm" icon={RotateCcw} onClick={fetchAppointments}>
             Refresh
           </Button>
@@ -561,6 +622,12 @@ export const AppointmentsPage = () => {
                     <div>
                       <h3 className="text-base font-bold text-white">{appt.customerName}</h3>
                       <p className="text-xs text-brand-cyan font-medium">{appt.type}</p>
+                      {appt.organizationId?.name && (
+                        <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1 mt-1 inline-flex">
+                          <Building className="w-2.5 h-2.5" />
+                          {appt.organizationId.name}
+                        </span>
+                      )}
                     </div>
                     <Badge variant={statusVariant(appt.status)} size="xs">
                       {appt.status === 'calling' ? 'Calling...' : appt.status}
@@ -603,6 +670,15 @@ export const AppointmentsPage = () => {
                     className="flex-1 py-2 rounded-xl bg-navy-800 hover:bg-navy-700 text-white text-xs font-semibold border border-slate-700 text-center transition"
                   >
                     View Details
+                  </button>
+
+                  <button
+                    onClick={() => handleTriggerCall(appt._id)}
+                    disabled={triggeringId === appt._id}
+                    className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
+                    title="Trigger Instant Outbound AI Call"
+                  >
+                    <PhoneCall className={`w-4 h-4 ${triggeringId === appt._id ? 'animate-bounce' : ''}`} />
                   </button>
 
                   {appt.meetingLink && (

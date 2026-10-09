@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   PhoneCall,
   Search,
@@ -16,29 +16,57 @@ import {
   Calendar,
   User,
   ExternalLink,
+  Building2,
 } from 'lucide-react';
 import { Card, CardHeader } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../api/client';
 
 export const CallsPage = () => {
+  const { isAdmin } = useAuth();
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
+
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [subTab, setSubTab] = useState('all'); // 'all', 'live', 'recordings', 'transcripts'
   const [statusFilter, setStatusFilter] = useState('all');
+  const [clientsList, setClientsList] = useState([]);
+  const [selectedOrgFilter, setSelectedOrgFilter] = useState('all');
   const toast = useToast();
 
   useEffect(() => {
+    if (isAdmin) {
+      fetchClients();
+    }
+  }, [isAdmin]);
+
+  const fetchClients = async () => {
+    try {
+      const res = await api.get('/admin/clients');
+      if (res?.data) {
+        setClientsList(res.data);
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  useEffect(() => {
     fetchCalls();
-  }, [statusFilter]);
+  }, [statusFilter, selectedOrgFilter]);
 
   const fetchCalls = async () => {
     try {
       setLoading(true);
-      const url = `/calls?status=${statusFilter}${search ? `&search=${search}` : ''}`;
+      let url = `/calls?status=${statusFilter}${search ? `&search=${search}` : ''}`;
+      if (isAdmin && selectedOrgFilter !== 'all') {
+        url += `&organizationId=${selectedOrgFilter}`;
+      }
       const res = await api.get(url);
       if (res.data) setCalls(res.data);
     } catch (err) {
@@ -97,9 +125,30 @@ export const CallsPage = () => {
           </p>
         </div>
 
-        <Button variant="outline" size="sm" icon={RotateCcw} onClick={fetchCalls}>
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#121215] border border-emerald-500/30 text-xs">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-gray-400 hidden sm:inline">Workspace:</span>
+              <select
+                value={selectedOrgFilter}
+                onChange={(e) => setSelectedOrgFilter(e.target.value)}
+                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="all" className="bg-[#121215] text-white">All Workspaces (Platform-wide)</option>
+                {clientsList.map((client) => (
+                  <option key={client.id || client._id} value={client.id || client._id} className="bg-[#121215] text-white">
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <Button variant="outline" size="sm" icon={RotateCcw} onClick={fetchCalls}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Navigation Sub-Tabs (Master SaaS Plan Requirement) */}
@@ -271,7 +320,7 @@ export const CallsPage = () => {
                     <td className="py-4 px-4">
                       {c.leadId ? (
                         <Link
-                          to={`/app/leads/${c.leadId._id || c.leadId}`}
+                          to={`${basePath}/leads/${c.leadId._id || c.leadId}`}
                           className="inline-flex items-center gap-1 text-brand-cyan hover:underline font-semibold"
                         >
                           <Badge variant="cyan" size="xs">
@@ -286,7 +335,7 @@ export const CallsPage = () => {
                     {/* Action */}
                     <td className="py-4 px-4 text-right">
                       <Link
-                        to={`/app/calls/${c._id}`}
+                        to={`${basePath}/calls/${c._id}`}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-navy-800 hover:bg-navy-700 text-brand-cyan font-bold transition border border-slate-700 hover:border-cyan-500/50"
                       >
                         Review <ChevronRight className="w-3.5 h-3.5" />

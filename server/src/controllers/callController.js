@@ -12,9 +12,15 @@ const voiceService = require('../services/voiceService');
 // @access  Private
 exports.getCalls = async (req, res, next) => {
   try {
-    const { status, agentId, search, dateRange, limit = 50, page = 1 } = req.query;
+    const isAgencyAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin' || req.user?.role === 'agency_admin';
+    const { status, agentId, search, dateRange, organizationId, limit = 50, page = 1 } = req.query;
 
-    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
+    const query = {};
+    if (!isAgencyAdmin) {
+      query.organizationId = req.organizationId;
+    } else if (organizationId && organizationId !== 'all') {
+      query.organizationId = organizationId;
+    }
 
     if (status && status !== 'all') {
       query.status = status;

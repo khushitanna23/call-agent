@@ -54,6 +54,7 @@ app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/analytics', require('./routes/analyticsRoutes'));
 app.use('/api/billing', require('./routes/billingRoutes'));
 app.use('/api/integrations', require('./routes/integrationRoutes'));
+app.use('/api/phone-numbers', require('./routes/phoneNumberRoutes'));
 app.use('/api/webhook', require('./routes/webhookRoutes'));
 app.use('/api/webhooks', require('./routes/webhookRoutes'));
 app.use('/api/demo', require('./routes/demoRoutes'));
@@ -65,6 +66,7 @@ app.use('/api/app/appointments', require('./routes/appointmentRoutes'));
 app.use('/api/app/knowledge', require('./routes/knowledgeRoutes'));
 app.use('/api/app/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/app/calls', require('./routes/callRoutes'));
+app.use('/api/app/phone-numbers', require('./routes/phoneNumberRoutes'));
 
 // 404 Route Handler
 app.use((req, res, next) => {

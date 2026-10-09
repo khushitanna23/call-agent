@@ -7,6 +7,11 @@ import {
   MOCK_LEADS,
   MOCK_APPOINTMENTS,
   MOCK_ANALYTICS,
+  MOCK_CLIENTS,
+  MOCK_CAMPAIGNS,
+  MOCK_PHONE_NUMBERS,
+  MOCK_AUTOMATIONS,
+  MOCK_INTEGRATIONS,
 } from './mockData';
 
 const baseURL = import.meta.env.VITE_API_URL || '/api';
@@ -564,7 +569,82 @@ function resolveOfflineFallback(config) {
     };
   }
 
-  // 12. Billing
+  // 12. Phone Numbers
+  if (pathOnly.startsWith('/phone-numbers') || pathOnly.startsWith('/telephony')) {
+    if (method === 'post') {
+      const newNum = {
+        _id: 'pn_' + Date.now(),
+        phoneNumber: bodyData.phoneNumber || '+1 (800) 555-9999',
+        friendlyName: bodyData.friendlyName || 'Direct Line',
+        provider: bodyData.provider || 'demo',
+        status: 'active',
+        countryCode: 'US',
+        organizationId: { name: 'Client Workspace' },
+        forwardToNumber: bodyData.forwardToNumber || '+1 (555) 789-0123',
+        callsThisMonth: 0,
+      };
+      return { success: true, message: 'Phone number provisioned successfully', data: newNum };
+    }
+    if (method === 'put' || method === 'patch') {
+      return { success: true, message: 'Phone number updated successfully' };
+    }
+    return { success: true, count: MOCK_PHONE_NUMBERS.length, data: MOCK_PHONE_NUMBERS };
+  }
+
+  // 13. Campaigns
+  if (pathOnly.startsWith('/campaigns')) {
+    if (method === 'post') {
+      const newCamp = {
+        _id: 'camp_' + Date.now(),
+        id: 'camp_' + Date.now(),
+        name: bodyData.name || 'Inbound Reception Campaign',
+        type: bodyData.type || 'inbound_reception',
+        status: 'active',
+        targetAudience: bodyData.targetAudience || 'All Inbound Calls',
+        hours: bodyData.hours || '24/7 Priority',
+        retries: 'Instant auto-answer',
+        assignedAgent: bodyData.assignedAgent || 'Sarah (AI Receptionist)',
+        metrics: { totalCalls: 0, qualifiedLeads: 0, appointmentsBooked: 0 },
+      };
+      return { success: true, message: 'Campaign created successfully', data: newCamp };
+    }
+    if (method === 'put' || method === 'patch') {
+      return { success: true, message: 'Campaign updated successfully' };
+    }
+    return { success: true, count: MOCK_CAMPAIGNS.length, data: MOCK_CAMPAIGNS };
+  }
+
+  // 14. Automations
+  if (pathOnly.startsWith('/automations')) {
+    if (method === 'post') {
+      const newAuto = {
+        id: 'auto_' + Date.now(),
+        name: bodyData.name || 'New Lead Alert',
+        trigger: bodyData.trigger || 'lead_qualified',
+        action: bodyData.action || 'send_sms_followup',
+        description: bodyData.description || 'Automated trigger rule',
+        isActive: true,
+      };
+      return { success: true, message: 'Automation created successfully', data: newAuto };
+    }
+    if (method === 'put' || method === 'patch') {
+      return { success: true, message: 'Automation updated successfully' };
+    }
+    return { success: true, data: MOCK_AUTOMATIONS };
+  }
+
+  // 15. Integrations
+  if (pathOnly.startsWith('/integrations')) {
+    if (method === 'post') {
+      return { success: true, message: 'Integration connected successfully' };
+    }
+    if (method === 'delete') {
+      return { success: true, message: 'Integration disconnected successfully' };
+    }
+    return { success: true, data: MOCK_INTEGRATIONS };
+  }
+
+  // 16. Billing
   if (pathOnly.startsWith('/billing')) {
     if (pathOnly.includes('/change-plan')) {
       return { success: true, message: 'Plan updated successfully', plan: bodyData.plan || 'growth' };
@@ -573,23 +653,43 @@ function resolveOfflineFallback(config) {
       success: true,
       plan: 'growth',
       minutesAllowance: 1000,
-      minutesUsed: 0,
-      invoices: [],
+      minutesUsed: 142,
+      invoices: [
+        {
+          _id: 'inv_1',
+          invoiceNumber: 'INV-2026-001',
+          amount: 249,
+          currency: 'USD',
+          status: 'paid',
+          paidAt: new Date(Date.now() - 30 * 86400000).toISOString(),
+          description: 'Growth Plan Subscription - 1,000 Voice Minutes',
+        },
+        {
+          _id: 'inv_2',
+          invoiceNumber: 'INV-2026-002',
+          amount: 249,
+          currency: 'USD',
+          status: 'paid',
+          paidAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+          description: 'Growth Plan Monthly Renewal',
+        },
+      ],
+      currentPlan: {
+        id: 'growth',
+        name: 'Growth',
+        price: 249,
+        billingCycle: 'monthly',
+        renewalDate: 'Nov 01, 2026',
+      },
+      usageMeter: {
+        minutesUsed: 142,
+        minutesAllowance: 1000,
+        minutesRemaining: 858,
+      },
     };
   }
 
-  // 13. Integrations
-  if (pathOnly.startsWith('/integrations')) {
-    if (method === 'post') {
-      return { success: true, message: 'Integration connected successfully' };
-    }
-    if (method === 'delete') {
-      return { success: true, message: 'Integration disconnected successfully' };
-    }
-    return { success: true, data: [] };
-  }
-
-  // 14. Demo
+  // 17. Demo
   if (pathOnly.startsWith('/demo')) {
     if (pathOnly.includes('/book')) {
       return { success: true, message: 'Demo booked successfully' };
@@ -600,37 +700,117 @@ function resolveOfflineFallback(config) {
     return { success: true, message: 'Demo session active' };
   }
 
-  // 15. Admin
+  // 18. Clients & Client Management
+  if (pathOnly.startsWith('/clients') || pathOnly.startsWith('/admin/clients')) {
+    if (pathOnly.includes('/toggle-status')) {
+      return { success: true, message: 'Client status updated successfully', status: 'active' };
+    }
+    if (method === 'post') {
+      const newClient = {
+        id: 'org_' + Date.now(),
+        _id: 'org_' + Date.now(),
+        name: bodyData.name || 'New Client Company',
+        slug: (bodyData.name || 'client').toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        plan: (bodyData.plan || 'growth').toUpperCase(),
+        status: 'active',
+        minutesUsed: 0,
+        minutesAllowance: Number(bodyData.minutesAllowance) || 1000,
+        agentCount: 1,
+        callCount: 0,
+        leadCount: 0,
+        appointmentCount: 0,
+        campaignCount: 1,
+        createdAt: new Date().toISOString(),
+        joinedDate: 'Just now',
+        owner: {
+          name: bodyData.ownerName || 'Account Owner',
+          email: bodyData.ownerEmail || 'client@example.com',
+        },
+        phoneNumbers: [
+          { number: '+1 (800) 555-' + Math.floor(1000 + Math.random() * 9000), label: 'Primary Line', isActive: true, provider: 'demo' },
+        ],
+      };
+      return { success: true, message: 'Client provisioned successfully!', data: newClient };
+    }
+    if (method === 'put' || method === 'patch') {
+      return { success: true, message: 'Client details updated successfully' };
+    }
+    if (method === 'get' && (pathOnly.match(/\/clients\/[^\/]+$/) || pathOnly.match(/\/admin\/clients\/[^\/]+$/))) {
+      const clientId = pathOnly.split('/').pop();
+      const match = MOCK_CLIENTS.find((c) => c.id === clientId || c._id === clientId) || MOCK_CLIENTS[0];
+      return {
+        success: true,
+        data: {
+          organization: match,
+          owner: match.owner,
+          agents: [MOCK_AGENT],
+          recentCalls: MOCK_CALLS.slice(0, 5),
+          recentLeads: MOCK_LEADS.slice(0, 5),
+          stats: {
+            agentCount: match.agentCount,
+            callCount: match.callCount,
+            leadCount: match.leadCount,
+            appointmentCount: match.appointmentCount,
+            minutesUsed: match.minutesUsed,
+            minutesAllowance: match.minutesAllowance,
+          },
+        },
+      };
+    }
+    return { success: true, count: MOCK_CLIENTS.length, data: MOCK_CLIENTS };
+  }
+
+  // 19. Admin Platform Control
   if (pathOnly.startsWith('/admin')) {
     if (pathOnly.includes('/appointments')) {
-      return { success: true, count: 0, data: [] };
+      return { success: true, count: MOCK_APPOINTMENTS.length, data: MOCK_APPOINTMENTS };
     }
     if (pathOnly.includes('/metrics')) {
       return {
         success: true,
         data: {
-          mrr: 0,
-          customers: 0,
-          activeSubscriptions: 0,
-          calls: 0,
-          minutes: 0,
-          aiCost: 0,
-          revenue: 0,
-          grossMargin: 100,
+          mrr: 12450,
+          customers: MOCK_CLIENTS.length,
+          activeSubscriptions: MOCK_CLIENTS.filter((c) => c.status === 'active').length,
+          calls: 288,
+          minutes: 1707,
+          aiCost: 68.28,
+          revenue: 12450,
+          grossMargin: 99.4,
           churn: '0.0%',
+          systemHealth: {
+            uptime: '99.98%',
+            latencyMs: 32,
+            apiStatus: 'healthy',
+            voicePipeline: 'operational',
+          },
         },
       };
     }
-    if (pathOnly.includes('/clients') || pathOnly.includes('/customers') || pathOnly.includes('/agents') || pathOnly.includes('/calls') || pathOnly.includes('/leads')) {
-      return { success: true, data: [] };
+    if (pathOnly.includes('/calls')) {
+      return { success: true, count: MOCK_CALLS.length, data: MOCK_CALLS };
+    }
+    if (pathOnly.includes('/leads')) {
+      return { success: true, count: MOCK_LEADS.length, data: MOCK_LEADS };
+    }
+    if (pathOnly.includes('/agents')) {
+      return { success: true, count: 1, data: [MOCK_AGENT] };
     }
     if (pathOnly.includes('/error-logs')) {
-      return { success: true, count: 0, data: [] };
+      return {
+        success: true,
+        count: 3,
+        data: [
+          { id: 'LOG-01', service: 'VoiceGateway', message: 'Carrier trunk latency nominal (28ms)', timestamp: new Date(Date.now() - 15 * 60000), severity: 'info' },
+          { id: 'LOG-02', service: 'CalendarSync', message: 'Google Calendar OAuth token renewed', timestamp: new Date(Date.now() - 45 * 60000), severity: 'info' },
+          { id: 'LOG-03', service: 'SpeechTTS', message: 'ElevenLabs voice stream verified', timestamp: new Date(Date.now() - 120 * 60000), severity: 'info' },
+        ],
+      };
     }
     return {
       success: true,
-      stats: { totalTenants: 0, totalCalls: 0, activeAgents: 0, mrr: 0 },
-      data: [],
+      stats: { totalTenants: MOCK_CLIENTS.length, totalCalls: 288, activeAgents: 4, mrr: 12450 },
+      data: MOCK_CLIENTS,
     };
   }
 

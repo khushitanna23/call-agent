@@ -1,68 +1,15 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Users,
-  Bot,
-  PhoneCall,
-  Calendar,
-  Layers,
-  Activity,
-  DollarSign,
-  Settings,
-  HelpCircle,
-  FileText,
-  Shield,
-  ArrowRight,
-  ExternalLink,
-  Smartphone,
-  Sparkles,
-} from 'lucide-react';
+import { Shield, ArrowRight, Bot } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../common/Badge';
+import { getNavSections } from '../../config/navigation';
 
 export const AdminSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
   const { user } = useAuth();
   const location = useLocation();
 
-  const navSections = [
-    {
-      group: 'Platform Cockpit',
-      items: [
-        { label: 'Agency Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
-      ],
-    },
-    {
-      group: 'Client Management',
-      items: [
-        { label: 'Client Workspaces', icon: Users, path: '/admin/clients', badge: 'Multi-Tenant' },
-        { label: 'White-Label Branding', icon: Sparkles, path: '/admin/whitelabel' },
-      ],
-    },
-    {
-      group: 'Voice Infrastructure',
-      items: [
-        { label: 'Carrier & Telephony', icon: Smartphone, path: '/admin/telephony' },
-        { label: 'Billing & Markups', icon: DollarSign, path: '/admin/billing' },
-        { label: 'Platform AI Agents', icon: Bot, path: '/admin/agents' },
-        { label: 'Call Records', icon: PhoneCall, path: '/admin/calls' },
-      ],
-    },
-    {
-      group: 'Pipeline Overview',
-      items: [
-        { label: 'Platform Leads', icon: Layers, path: '/admin/leads' },
-        { label: 'Platform Appointments', icon: Calendar, path: '/admin/appointments', badge: 'Live Sync' },
-      ],
-    },
-    {
-      group: 'Platform Control',
-      items: [
-        { label: 'System Telemetry', icon: Activity, path: '/admin/logs' },
-        { label: 'Agency Settings', icon: Settings, path: '/admin/settings' },
-      ],
-    },
-  ];
+  const navSections = getNavSections('admin');
 
   return (
     <>
@@ -109,7 +56,11 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsM
                 </div>
               )}
               {section.items.map((item) => {
-                const isActive = location.pathname === item.path;
+                const isActive =
+                  location.pathname === item.path ||
+                  (item.path !== '/admin/dashboard' &&
+                    item.path !== '/admin/agents/new' &&
+                    location.pathname.startsWith(item.path));
                 const Icon = item.icon;
                 return (
                   <NavLink
@@ -132,9 +83,9 @@ export const AdminSidebar = ({ isCollapsed, setIsCollapsed, isMobileOpen, setIsM
                       <span className="truncate flex-1">{item.label}</span>
                     )}
                     {!isCollapsed && item.badge && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                      <Badge variant="amber" size="xs">
                         {item.badge}
-                      </span>
+                      </Badge>
                     )}
                   </NavLink>
                 );

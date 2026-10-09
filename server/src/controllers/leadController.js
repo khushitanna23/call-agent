@@ -5,12 +5,17 @@ const Appointment = require('../models/Appointment');
 
 // @desc    Get all leads with filtering & pipeline stage grouping
 // @route   GET /api/leads
-// @access  Private
 exports.getLeads = async (req, res, next) => {
   try {
-    const { stage, search, minScore } = req.query;
+    const isAgencyAdmin = req.user?.role === 'admin' || req.user?.role === 'super_admin' || req.user?.role === 'agency_admin';
+    const { stage, search, minScore, organizationId } = req.query;
 
-    const query = req.user?.role === 'admin' ? {} : { organizationId: req.organizationId };
+    const query = {};
+    if (!isAgencyAdmin) {
+      query.organizationId = req.organizationId;
+    } else if (organizationId && organizationId !== 'all') {
+      query.organizationId = organizationId;
+    }
 
     if (stage && stage !== 'all') {
       query.pipelineStage = stage;

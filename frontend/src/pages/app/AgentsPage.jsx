@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Bot,
   Plus,
@@ -18,6 +18,8 @@ import { useToast } from '../../context/ToastContext';
 import api from '../../api/client';
 
 export const AgentsPage = () => {
+  const location = useLocation();
+  const basePath = location.pathname.startsWith('/admin') ? '/admin' : '/client';
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
@@ -65,7 +67,7 @@ export const AgentsPage = () => {
           <Button variant="outline" size="sm" icon={RotateCcw} onClick={fetchAgents}>
             Refresh
           </Button>
-          <Link to="/app/agents/new">
+          <Link to={`${basePath}/agents/new`}>
             <Button variant="primary" size="sm" icon={Plus}>
               Create AI Receptionist
             </Button>
@@ -133,7 +135,7 @@ export const AgentsPage = () => {
               </button>
 
               <Link
-                to={`/app/appointments?book=true&agentId=${agent._id}`}
+                to={`${basePath}/appointments?book=true&agentId=${agent._id}`}
                 className="px-2.5 py-2 rounded-xl bg-brand-cyan/10 hover:bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30 text-xs font-semibold inline-flex items-center gap-1.5 transition"
                 title={`Schedule appointment with ${agent.name}`}
               >
@@ -142,7 +144,7 @@ export const AgentsPage = () => {
               </Link>
 
               <Link
-                to="/app/agents/new"
+                to={`${basePath}/agents/new`}
                 className="p-2 rounded-xl bg-navy-800 hover:bg-navy-700 text-slate-300 border border-slate-700 transition"
                 title="Edit agent settings"
               >
@@ -224,7 +226,7 @@ export const AgentsPage = () => {
 
                 <div className="pt-3 border-t border-slate-800">
                   {tmpl.isAvailable ? (
-                    <Link to="/app/agents/new" className="block w-full">
+                    <Link to={`${basePath}/agents/new`} className="block w-full">
                       <Button variant="primary" size="sm" className="w-full text-xs">
                         Use Template
                       </Button>
