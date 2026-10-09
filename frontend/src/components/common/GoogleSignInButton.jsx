@@ -66,10 +66,10 @@ export const GoogleSignInButton = ({ label = 'Continue with Google', className =
       // Save this real Google account locally for instant 1-click chooser next time
       try {
         const accInfo = {
-          email: payload.email || res.user?.email,
-          name: payload.name || res.user?.name,
-          avatar: payload.avatar || res.user?.avatar,
-          role: res.role || payload.role || 'client',
+          email: payload.email || res?.user?.email,
+          name: payload.name || res?.user?.name,
+          avatar: payload.avatar || res?.user?.avatar,
+          role: res?.role || res?.user?.role || payload?.role || 'client',
         };
         const existing = savedAccounts.filter((a) => a.email.toLowerCase() !== accInfo.email.toLowerCase());
         const updated = [accInfo, ...existing].slice(0, 3);
@@ -77,13 +77,13 @@ export const GoogleSignInButton = ({ label = 'Continue with Google', className =
         localStorage.setItem('vedanco_saved_google_accounts', JSON.stringify(updated));
       } catch {}
 
-      toast.success(res?.message || `Signed in with Google as ${res.user?.name || 'User'}!`);
+      toast.success(res?.message || `Signed in with Google as ${res?.user?.name || payload?.name || 'User'}!`);
       setModalOpen(false);
 
       if (onSuccess) {
         onSuccess(res);
       } else {
-        const targetRole = res?.role || res?.user?.role;
+        const targetRole = res?.role || res?.user?.role || payload?.role || 'client';
         const dest = targetRole === 'admin' ? '/admin/dashboard' : '/client/dashboard';
         navigate(dest, { replace: true });
       }

@@ -772,6 +772,13 @@ export const LandingPage = () => {
               </button>
             </div>
           </div>
+
+          <div className="mt-12 text-center text-sm text-gray-400">
+            Already have a registered account?{' '}
+            <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-4">
+              Log in to your dashboard
+            </Link>
+          </div>
         </div>
       </section>
 

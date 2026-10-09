@@ -2,6 +2,7 @@ import axios from 'axios';
 import {
   registerLocalUser,
   loginLocalUser,
+  loginLocalGoogleUser,
   MOCK_AGENT,
   MOCK_CALLS,
   MOCK_LEADS,
@@ -76,6 +77,11 @@ function resolveOfflineFallback(config) {
       bodyData.password,
       bodyData.companyName
     );
+  }
+
+  // 2b. Auth Google Fallback
+  if (pathOnly === '/auth/google' && method === 'post') {
+    return loginLocalGoogleUser(bodyData);
   }
 
   // 3. Auth Me Fallback

@@ -46,12 +46,23 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
           <a href="#solutions" className="hover:text-emerald-400 transition">Solutions</a>
           <a href="#how-it-works" className="hover:text-emerald-400 transition">How It Works</a>
           <Link to="/pricing" className="hover:text-emerald-400 transition">Pricing</Link>
+          <Link to="/login" className="text-emerald-400 hover:text-emerald-300 transition font-semibold">Log In</Link>
         </div>
 
         {/* CTA Buttons */}
         <div className="hidden md:flex items-center gap-2.5">
           {isAuthenticated ? (
             <div className="flex items-center gap-2">
+              <Link to="/login">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-800 text-gray-300 hover:text-white hover:bg-white/5 font-semibold px-3"
+                >
+                  Log In
+                </Button>
+              </Link>
+
               <Button
                 variant="primary"
                 size="sm"
@@ -128,25 +139,27 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
             </div>
           ) : (
             <>
-              {/* Separate, direct Client & Admin Login routes */}
-              <Link to="/login?role=client">
+              {/* Primary, prominent Log In Button */}
+              <Link to="/login">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 font-semibold px-3"
+                  className="border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 font-bold px-3.5"
                 >
-                  Client Login
+                  Log In
                 </Button>
               </Link>
 
+              {/* Admin Portal shortcut */}
               <Link to="/login?role=admin">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 font-semibold px-3"
+                  className="text-amber-400/80 hover:text-amber-300 hover:bg-amber-500/10 text-xs px-2.5 font-medium"
+                  title="Admin Portal"
                 >
                   <Shield className="w-3.5 h-3.5 mr-1 text-amber-400" />
-                  Admin Portal
+                  Admin
                 </Button>
               </Link>
 
@@ -178,7 +191,7 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
               size="sm"
               className="text-xs px-2.5 py-1 text-emerald-400 border-emerald-500/40 font-semibold"
             >
-              Login
+              Log In
             </Button>
           </Link>
           <button
@@ -221,27 +234,50 @@ export const PublicNavbar = ({ onOpenVoiceDemo }) => {
           >
             Pricing
           </Link>
+          <Link
+            to="/login"
+            onClick={() => setMobileMenuOpen(false)}
+            className="text-base text-emerald-400 hover:text-emerald-300 font-semibold"
+          >
+            Log In
+          </Link>
           <div className="pt-4 border-t border-emerald-950/60 flex flex-col gap-2.5">
             {isAuthenticated ? (
-              <Button
-                variant="primary"
-                size="md"
-                className="w-full"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigate(defaultDashboardPath || '/client/dashboard');
-                }}
-              >
-                Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="w-full"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    navigate(defaultDashboardPath || '/client/dashboard');
+                  }}
+                >
+                  Go to Dashboard <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full text-center py-2.5 text-sm font-semibold text-gray-300 bg-[#18181c] hover:bg-[#222228] border border-slate-800 rounded-xl"
+                >
+                  Log In / Switch Account
+                </Link>
+              </>
             ) : (
               <>
                 <Link
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2.5 text-sm font-semibold text-white bg-[#18181c] hover:bg-[#222228] border border-emerald-500/20 rounded-xl"
+                  className="w-full text-center py-2.5 text-sm font-semibold text-emerald-300 bg-[#18181c] hover:bg-[#222228] border border-emerald-500/40 rounded-xl"
                 >
-                  Login
+                  Log In
+                </Link>
+                <Link
+                  to="/login?role=admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-full text-center py-2 text-xs font-semibold text-amber-400/90 hover:bg-amber-500/10 rounded-xl border border-amber-500/20"
+                >
+                  Admin Portal Login
                 </Link>
                 <Button
                   variant="primary"

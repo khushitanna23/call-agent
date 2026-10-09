@@ -54,6 +54,7 @@ export const PublicFooter = () => {
           {/* Company & Resources */}
           <div className="flex flex-col gap-3 text-sm">
             <h4 className="text-white font-semibold tracking-wider text-xs uppercase">Platform</h4>
+            <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium transition">Log In</Link>
             <Link to="/login?role=client" className="hover:text-emerald-400 transition">Client Workspace Portal</Link>
             <Link to="/login?role=admin" className="hover:text-amber-400 transition text-amber-400/90 font-medium">Super Admin Cockpit</Link>
             <Link to="/demo" className="hover:text-white transition">Book Live Demo</Link>

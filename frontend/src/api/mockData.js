@@ -262,6 +262,123 @@ export const loginLocalUser = (email, password) => {
   };
 };
 
+export const loginLocalGoogleUser = (googleData = {}) => {
+  try {
+    const normEmail = (googleData.email || 'googleuser@gmail.com').toLowerCase().trim();
+    const userName = (googleData.name || normEmail.split('@')[0] || 'User').trim();
+    const assignedRole = (googleData.role === 'admin' || normEmail.includes('admin')) ? 'admin' : 'client';
+
+    const allUsers = getStoredUsers();
+    let user = allUsers.find((u) => {
+      const uEmail = (u.email || '').toLowerCase();
+      return uEmail === normEmail;
+    });
+
+    if (!user) {
+      const orgId = 'org_' + Date.now();
+      const orgName = `${userName}'s Workspace`;
+      const newOrg = {
+        id: orgId,
+        _id: orgId,
+        name: orgName,
+        slug: orgName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000),
+        plan: 'growth',
+        minutesAllowance: 1000,
+        minutesUsed: 0,
+        createdAt: new Date().toISOString(),
+        phoneNumbers: [
+          {
+            number: '+1 (800) 555-' + Math.floor(1000 + Math.random() * 9000),
+            label: 'Primary Line',
+            provider: 'demo',
+            isActive: true,
+          },
+        ],
+        settings: {
+          timezone: 'America/New_York',
+          fallbackPhoneNumber: '+1 (555) 789-0123',
+          recordingConsentMessage: 'This call may be recorded for quality and training purposes.',
+        },
+      };
+
+      user = {
+        id: 'usr_' + Date.now(),
+        _id: 'usr_' + Date.now(),
+        name: userName,
+        email: normEmail,
+        googleId: googleData.googleId || 'g_' + Date.now(),
+        avatar: googleData.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName)}&backgroundColor=059669,10b981`,
+        role: assignedRole,
+        organizationId: orgId,
+        organization: newOrg,
+        createdAt: new Date().toISOString(),
+      };
+
+      saveCustomUser(user);
+    } else {
+      if (assignedRole) user.role = assignedRole;
+      if (googleData.avatar && !user.avatar) user.avatar = googleData.avatar;
+      saveCustomUser(user);
+    }
+
+    const org = user.organization || {
+      id: user.organizationId || 'org_demo_1',
+      _id: user.organizationId || 'org_demo_1',
+      name: `${user.name}'s Workspace`,
+      slug: 'user-workspace',
+      plan: 'growth',
+      minutesAllowance: 1000,
+      minutesUsed: 0,
+      createdAt: new Date().toISOString(),
+      phoneNumbers: [
+        {
+          number: '+1 (800) 555-0199',
+          label: 'Primary Line',
+          provider: 'demo',
+          isActive: true,
+        },
+      ],
+    };
+
+    const token = 'vedanco_jwt_' + Math.random().toString(36).substring(2) + '_' + Date.now();
+    safeSetItem('vedanco_token', token);
+    safeSetItem('vedanco_user', JSON.stringify({
+      id: user.id || user._id,
+      _id: user.id || user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      organizationId: user.organizationId,
+    }));
+    safeSetItem('vedanco_org_id', user.organizationId || org.id);
+    safeSetItem(CURRENT_ORG_KEY, JSON.stringify(org));
+
+    return {
+      success: true,
+      message: 'Google login successful',
+      token,
+      role: user.role === 'admin' ? 'admin' : 'client',
+      user: {
+        id: user.id || user._id,
+        _id: user.id || user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        organizationId: user.organizationId,
+      },
+      organization: org,
+    };
+  } catch (err) {
+    console.error('Local Google login error:', err);
+    return {
+      success: false,
+      message: 'Failed to process Google login locally',
+    };
+  }
+};
+
 // Fallback Mock Data for other API routes
 export const MOCK_AGENT = {
   _id: 'agent_sarah_1',
