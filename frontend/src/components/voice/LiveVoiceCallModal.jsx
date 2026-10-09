@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, PhoneOff, PhoneCall, Volume2, Sparkles, User, Bot, AlertCircle, Globe, Languages } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, PhoneCall, Volume2, VolumeX, Sparkles, User, Bot, AlertCircle, Globe, Languages } from 'lucide-react';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import api from '../../api/client';
@@ -11,6 +11,7 @@ export const LiveVoiceCallModal = ({ isOpen, onClose, agentName = 'Sarah', initi
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [autoVoiceOutput, setAutoVoiceOutput] = useState(true);
   const [transcript, setTranscript] = useState([]);
   const [userInputText, setUserInputText] = useState('');
   const [connectionStatus, setConnectionStatus] = useState('disconnected'); // disconnected, connecting, connected
@@ -18,6 +19,8 @@ export const LiveVoiceCallModal = ({ isOpen, onClose, agentName = 'Sarah', initi
   const timerRef = useRef(null);
   const transcriptEndRef = useRef(null);
   const recognitionRef = useRef(null);
+  const currentUtteranceRef = useRef(null);
+  const speechKeepAliveRef = useRef(null);
 
   // Auto scroll transcript
   useEffect(() => {
@@ -62,43 +65,100 @@ export const LiveVoiceCallModal = ({ isOpen, onClose, agentName = 'Sarah', initi
     }
   }, [language]);
 
-  const speakText = (text, targetLang = language) => {
+  const stopSpeaking = () => {
+    if (speechKeepAliveRef.current) {
+      clearInterval(speechKeepAliveRef.current);
+      speechKeepAliveRef.current = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.02;
-      utterance.lang = targetLang === 'gujarati' ? 'gu-IN' : 'en-US';
-
       try {
-        const voices = window.speechSynthesis.getVoices() || [];
-        if (targetLang === 'gujarati') {
-          const guVoice = voices.find(
-            (v) =>
-              v.lang?.includes('gu') ||
-              v.lang?.toLowerCase().includes('gu-in') ||
-              v.name?.toLowerCase().includes('gujarati') ||
-              v.name?.toLowerCase().includes('india')
-          );
-          if (guVoice) utterance.voice = guVoice;
-        } else {
-          const enVoice = voices.find(
-            (v) =>
-              v.lang?.includes('en') &&
-              (v.name?.includes('Natural') ||
-                v.name?.includes('Google') ||
-                v.name?.includes('Samantha') ||
-                v.name?.includes('Jenny'))
-          );
-          if (enVoice) utterance.voice = enVoice;
-        }
+        window.speechSynthesis.cancel();
       } catch (e) {}
+    }
+    setIsAiSpeaking(false);
+  };
 
-      utterance.onstart = () => setIsAiSpeaking(true);
-      utterance.onend = () => setIsAiSpeaking(false);
-      utterance.onerror = () => setIsAiSpeaking(false);
+  const speakText = (text, targetLang = language) => {
+    if (!autoVoiceOutput) return;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      stopSpeaking();
 
-      window.speechSynthesis.speak(utterance);
+      // 50ms delay lets browser finish any pending audio cancel cleanly
+      setTimeout(() => {
+        try {
+          window.speechSynthesis.resume();
+
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 0.95; // Clear natural pace
+          utterance.pitch = 1.0;
+          utterance.lang = targetLang === 'gujarati' ? 'gu-IN' : 'en-US';
+
+          const voices = window.speechSynthesis.getVoices() || [];
+          if (targetLang === 'gujarati') {
+            let guVoice = voices.find(
+              (v) =>
+                v.lang?.toLowerCase().startsWith('gu') ||
+                v.name?.toLowerCase().includes('gujarati')
+            );
+            if (!guVoice) {
+              guVoice = voices.find(
+                (v) =>
+                  v.lang?.toLowerCase().includes('hi') ||
+                  v.lang?.toLowerCase().includes('in') ||
+                  v.name?.toLowerCase().includes('india')
+              );
+            }
+            if (guVoice) utterance.voice = guVoice;
+          } else {
+            const enVoice = voices.find(
+              (v) =>
+                v.lang?.toLowerCase().startsWith('en') &&
+                (v.name?.includes('Natural') ||
+                  v.name?.includes('Google') ||
+                  v.name?.includes('Samantha') ||
+                  v.name?.includes('Jenny'))
+            );
+            if (enVoice) utterance.voice = enVoice;
+          }
+
+          utterance.onstart = () => setIsAiSpeaking(true);
+          utterance.onend = () => {
+            setIsAiSpeaking(false);
+            if (speechKeepAliveRef.current) {
+              clearInterval(speechKeepAliveRef.current);
+              speechKeepAliveRef.current = null;
+            }
+          };
+          utterance.onerror = () => {
+            setIsAiSpeaking(false);
+            if (speechKeepAliveRef.current) {
+              clearInterval(speechKeepAliveRef.current);
+              speechKeepAliveRef.current = null;
+            }
+          };
+
+          // Chromium Keep-Alive
+          if (speechKeepAliveRef.current) clearInterval(speechKeepAliveRef.current);
+          speechKeepAliveRef.current = setInterval(() => {
+            if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+              window.speechSynthesis.pause();
+              window.speechSynthesis.resume();
+            } else {
+              if (speechKeepAliveRef.current) {
+                clearInterval(speechKeepAliveRef.current);
+                speechKeepAliveRef.current = null;
+              }
+            }
+          }, 8000);
+
+          currentUtteranceRef.current = utterance;
+          window.__activeLiveVoiceUtterance = utterance;
+
+          window.speechSynthesis.speak(utterance);
+        } catch (e) {
+          setIsAiSpeaking(false);
+        }
+      }, 50);
     } else {
       setIsAiSpeaking(true);
       setTimeout(() => setIsAiSpeaking(false), 2500);
@@ -166,9 +226,7 @@ export const LiveVoiceCallModal = ({ isOpen, onClose, agentName = 'Sarah', initi
   };
 
   const endCall = () => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    stopSpeaking();
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -305,7 +363,34 @@ export const LiveVoiceCallModal = ({ isOpen, onClose, agentName = 'Sarah', initi
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Voice Output Setting Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const next = !autoVoiceOutput;
+                setAutoVoiceOutput(next);
+                if (!next) stopSpeaking();
+              }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                autoVoiceOutput
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                  : 'bg-[#09090c] text-gray-400 border-gray-800 hover:text-white'
+              }`}
+              title="Toggle AI speech voice output"
+            >
+              {autoVoiceOutput ? (
+                <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 text-gray-400" />
+              )}
+              <span>
+                {autoVoiceOutput
+                  ? (language === 'gujarati' ? '🔊 અવાજ: ચાલુ' : '🔊 Voice: ON')
+                  : (language === 'gujarati' ? '🔇 અવાજ: બંધ' : '🔇 Voice: OFF')}
+              </span>
+            </button>
+
             {/* Dual Language Switcher: English & Gujarati */}
             <div className="flex items-center p-1 rounded-xl bg-[#09090c] border border-emerald-500/30 shadow-inner">
               <button

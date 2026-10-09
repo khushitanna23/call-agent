@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Bot,
@@ -9,6 +9,8 @@ import {
   ArrowRight,
   ArrowLeft,
   Volume2,
+  VolumeX,
+  Square,
   FileText,
   Building,
   Check,
@@ -97,6 +99,21 @@ export const CreateAgentWizardPage = () => {
   // Step 7: Test Conversation Sandbox & Dual-Language state
   const [sandboxLanguage, setSandboxLanguage] = useState('english'); // 'english' | 'gujarati'
   const [isSpeakingMessageIdx, setIsSpeakingMessageIdx] = useState(null);
+  const [autoSpeakReplies, setAutoSpeakReplies] = useState(true); // Setting: whatever chatbot writes, speak it out completely!
+  const currentUtteranceRef = useRef(null);
+  const speechKeepAliveRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        if (speechKeepAliveRef.current) clearInterval(speechKeepAliveRef.current);
+        try {
+          window.speechSynthesis.cancel();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
   const [sandboxMessages, setSandboxMessages] = useState([
     {
       role: 'user',
@@ -190,10 +207,122 @@ export const CreateAgentWizardPage = () => {
     toast.info('Knowledge entry removed');
   };
 
-  // Step 7: Dual-Language Test AI in Sandbox
+  // Step 7: Dual-Language Test AI in Sandbox with Full Auto-Speech Engine
+  const stopSpeaking = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      if (speechKeepAliveRef.current) {
+        clearInterval(speechKeepAliveRef.current);
+        speechKeepAliveRef.current = null;
+      }
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {}
+    }
+    setIsSpeakingMessageIdx(null);
+  };
+
+  const speakSandboxMessage = (text, lang = sandboxLanguage, messageIdx = null) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    if (!text || !String(text).trim()) return;
+
+    const cleanText = String(text).trim();
+
+    // If currently speaking this message, clicking again toggles it off
+    if (isSpeakingMessageIdx === messageIdx && messageIdx !== null) {
+      stopSpeaking();
+      return;
+    }
+
+    stopSpeaking();
+
+    // Small delay ensures browser cancels any pending audio before starting new utterance
+    setTimeout(() => {
+      try {
+        window.speechSynthesis.resume();
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 0.95; // Crisp natural cadence
+        utterance.pitch = 1.0;
+        utterance.lang = lang === 'gujarati' ? 'gu-IN' : 'en-US';
+
+        const voices = window.speechSynthesis.getVoices() || [];
+        if (lang === 'gujarati') {
+          let voice = voices.find(
+            (v) =>
+              v.lang?.toLowerCase().startsWith('gu') ||
+              v.name?.toLowerCase().includes('gujarati')
+          );
+          if (!voice) {
+            voice = voices.find(
+              (v) =>
+                v.lang?.toLowerCase().includes('hi') ||
+                v.lang?.toLowerCase().includes('in') ||
+                v.name?.toLowerCase().includes('india')
+            );
+          }
+          if (voice) utterance.voice = voice;
+        } else {
+          const enVoice = voices.find(
+            (v) =>
+              v.lang?.toLowerCase().startsWith('en') &&
+              (v.name?.includes('Natural') ||
+                v.name?.includes('Google') ||
+                v.name?.includes('Samantha') ||
+                v.name?.includes('Jenny'))
+          );
+          if (enVoice) utterance.voice = enVoice;
+        }
+
+        utterance.onstart = () => {
+          setIsSpeakingMessageIdx(messageIdx);
+        };
+        utterance.onend = () => {
+          setIsSpeakingMessageIdx(null);
+          if (speechKeepAliveRef.current) {
+            clearInterval(speechKeepAliveRef.current);
+            speechKeepAliveRef.current = null;
+          }
+        };
+        utterance.onerror = () => {
+          setIsSpeakingMessageIdx(null);
+          if (speechKeepAliveRef.current) {
+            clearInterval(speechKeepAliveRef.current);
+            speechKeepAliveRef.current = null;
+          }
+        };
+
+        // Chromium Keep-Alive loop prevents Chrome from cutting off after 15 seconds
+        if (speechKeepAliveRef.current) clearInterval(speechKeepAliveRef.current);
+        speechKeepAliveRef.current = setInterval(() => {
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          } else {
+            if (speechKeepAliveRef.current) {
+              clearInterval(speechKeepAliveRef.current);
+              speechKeepAliveRef.current = null;
+            }
+          }
+        }, 8000);
+
+        // Retain reference globally to protect from Chrome Garbage Collection bug
+        currentUtteranceRef.current = utterance;
+        window.__activeAgentUtterance = utterance;
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('Speech synthesis error:', err);
+        setIsSpeakingMessageIdx(null);
+      }
+    }, 50);
+  };
+
   const handleSandboxLanguageChange = (newLang) => {
+    stopSpeaking();
     setSandboxLanguage(newLang);
+    let greetingText = '';
     if (newLang === 'gujarati') {
+      greetingText = `ચોક્કસ! મને તમને મદદ કરવામાં આનંદ થશે. અમે ${agentData.businessName || agentData.name} માટે સંપૂર્ણ બિઝનેસ કન્સલ્ટેશન, ગ્રાહક પૂછપરછ અને એપોઇન્ટમેન્ટ બુકિંગ સેવાઓ આપીએ છીએ. શું તમે વધુ માહિતી મેળવવા અથવા મુલાકાત શેડ્યૂલ કરવા માંગો છો?`;
       setSandboxMessages([
         {
           role: 'user',
@@ -201,10 +330,11 @@ export const CreateAgentWizardPage = () => {
         },
         {
           role: 'assistant',
-          content: `ચોક્કસ! મને તમને મદદ કરવામાં આનંદ થશે. અમે ${agentData.businessName || agentData.name} માટે સંપૂર્ણ બિઝનેસ કન્સલ્ટેશન, ગ્રાહક પૂછપરછ અને એપોઇન્ટમેન્ટ બુકિંગ સેવાઓ આપીએ છીએ. શું તમે વધુ માહિતી મેળવવા અથવા મુલાકાત શેડ્યૂલ કરવા માંગો છો?`,
+          content: greetingText,
         },
       ]);
     } else {
+      greetingText = `Sure! I'd be happy to help. We provide full-service property advisory, consultations, and verified market valuations for ${agentData.businessName || agentData.name}. Are you looking to buy, lease, or schedule a tour?`;
       setSandboxMessages([
         {
           role: 'user',
@@ -212,50 +342,13 @@ export const CreateAgentWizardPage = () => {
         },
         {
           role: 'assistant',
-          content: `Sure! I'd be happy to help. We provide full-service property advisory, consultations, and verified market valuations for ${agentData.businessName || agentData.name}. Are you looking to buy, lease, or schedule a tour?`,
+          content: greetingText,
         },
       ]);
     }
-  };
 
-  const handleSpeakSandboxMessage = (text, idx) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      if (isSpeakingMessageIdx === idx) {
-        setIsSpeakingMessageIdx(null);
-        return;
-      }
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = sandboxLanguage === 'gujarati' ? 'gu-IN' : 'en-US';
-      utterance.rate = 1.0;
-      utterance.pitch = 1.02;
-
-      try {
-        const voices = window.speechSynthesis.getVoices() || [];
-        if (sandboxLanguage === 'gujarati') {
-          const guVoice = voices.find(
-            (v) =>
-              v.lang?.includes('gu') ||
-              v.lang?.toLowerCase().includes('gu-in') ||
-              v.name?.toLowerCase().includes('gujarati')
-          );
-          if (guVoice) utterance.voice = guVoice;
-        } else {
-          const enVoice = voices.find(
-            (v) =>
-              v.lang?.includes('en') &&
-              (v.name?.includes('Natural') ||
-                v.name?.includes('Google') ||
-                v.name?.includes('Samantha'))
-          );
-          if (enVoice) utterance.voice = enVoice;
-        }
-      } catch (e) {}
-
-      utterance.onstart = () => setIsSpeakingMessageIdx(idx);
-      utterance.onend = () => setIsSpeakingMessageIdx(null);
-      utterance.onerror = () => setIsSpeakingMessageIdx(null);
-      window.speechSynthesis.speak(utterance);
+    if (autoSpeakReplies) {
+      speakSandboxMessage(greetingText, newLang, 1);
     }
   };
 
@@ -333,14 +426,18 @@ export const CreateAgentWizardPage = () => {
         }
       }
 
-      setSandboxMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: replyContent,
-          tool: res?.data?.triggeredTool,
-        },
-      ]);
+      const assistantMsg = {
+        role: 'assistant',
+        content: replyContent,
+        tool: res?.data?.triggeredTool,
+      };
+
+      setSandboxMessages((prev) => [...prev, assistantMsg]);
+
+      // AUTO-SPEAK: Speaks out complete message when AI writes in chatbot!
+      if (autoSpeakReplies) {
+        speakSandboxMessage(replyContent, sandboxLanguage, updatedMessages.length);
+      }
     } catch (err) {
       const fallback =
         sandboxLanguage === 'gujarati'
@@ -354,6 +451,10 @@ export const CreateAgentWizardPage = () => {
           content: fallback,
         },
       ]);
+
+      if (autoSpeakReplies) {
+        speakSandboxMessage(fallback, sandboxLanguage, updatedMessages.length);
+      }
     } finally {
       setIsTesting(false);
     }
@@ -992,8 +1093,54 @@ export const CreateAgentWizardPage = () => {
                 </p>
               </div>
 
-              {/* Language Switcher & Ready Status */}
-              <div className="flex items-center gap-2">
+              {/* Language Switcher, Auto-Voice Setting & Audio Controls */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Auto-Voice Toggle Setting */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !autoSpeakReplies;
+                    setAutoSpeakReplies(next);
+                    if (!next) stopSpeaking();
+                    toast.info(
+                      next
+                        ? (sandboxLanguage === 'gujarati' ? '🔊 ઓટો-અવાજ ચાલુ: AI જે લખશે તે બોલશે' : '🔊 Auto-Voice ON: AI will speak replies completely')
+                        : (sandboxLanguage === 'gujarati' ? '🔇 અવાજ બંધ કર્યો' : '🔇 Auto-Voice Muted')
+                    );
+                  }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                    autoSpeakReplies
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-sm shadow-emerald-500/20'
+                      : 'bg-navy-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                  title={sandboxLanguage === 'gujarati' ? 'સ્વચાલિત અવાજ સેટિંગ: AI ચેટબોટમાં લખે ત્યારે આપમેળે બોલશે' : 'Toggle auto-speak when AI types a response'}
+                >
+                  {autoSpeakReplies ? (
+                    <Volume2 className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  ) : (
+                    <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  <span>
+                    {autoSpeakReplies
+                      ? (sandboxLanguage === 'gujarati' ? '🔊 અવાજ: ચાલુ' : '🔊 Voice: ON')
+                      : (sandboxLanguage === 'gujarati' ? '🔇 અવાજ: બંધ' : '🔇 Voice: OFF')}
+                  </span>
+                </button>
+
+                {/* Stop button when actively speaking */}
+                {isSpeakingMessageIdx !== null && (
+                  <button
+                    type="button"
+                    onClick={stopSpeaking}
+                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center gap-1 hover:bg-rose-500/30 transition animate-pulse"
+                    title={sandboxLanguage === 'gujarati' ? 'બોલવાનું બંધ કરો' : 'Stop speaking'}
+                  >
+                    <Square className="w-3 h-3 fill-rose-400" />
+                    <span>{sandboxLanguage === 'gujarati' ? 'અવાજ રોકો' : 'Stop Voice'}</span>
+                  </button>
+                )}
+
+                {/* Dual Language Switcher */}
                 <div className="flex items-center p-1 rounded-xl bg-navy-950 border border-slate-800 shadow-inner">
                   <button
                     type="button"
@@ -1027,6 +1174,36 @@ export const CreateAgentWizardPage = () => {
               </div>
             </div>
 
+            {/* Auto-Speech Active Notification Banner */}
+            <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-navy-950 border border-emerald-500/20 text-xs text-slate-300">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full ${
+                      autoSpeakReplies ? 'bg-emerald-400' : 'bg-slate-500'
+                    } opacity-75`}
+                  ></span>
+                  <span
+                    className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                      autoSpeakReplies ? 'bg-emerald-500' : 'bg-slate-400'
+                    }`}
+                  ></span>
+                </span>
+                <span className="font-medium">
+                  {sandboxLanguage === 'gujarati'
+                    ? (autoSpeakReplies
+                        ? '💡 AI ચેટબોટમાં જે કંઈ પણ લખશે, તે આખેઆખું સ્પષ્ટ અવાજમાં બોલશે (Auto-Voice સક્રિય છે)'
+                        : '🔇 અવાજ બંધ છે. AI ફક્ત ચેટબોટમાં લખશે. સાંભળવા માટે "🔊 અવાજ: ચાલુ" કરો.')
+                    : (autoSpeakReplies
+                        ? '💡 Whatever the AI writes in the chatbot, it will speak out completely aloud (Auto-Voice Active)'
+                        : '🔇 Voice is muted. AI will only type. Click "🔊 Voice: ON" above to enable auto-speech.')}
+                </span>
+              </div>
+              <span className="text-[11px] text-emerald-400 font-bold hidden sm:inline-block">
+                {sandboxLanguage === 'gujarati' ? '🇮🇳 ગુજરાતી ભાષણ (Speech)' : '🇺🇸 English Speech'}
+              </span>
+            </div>
+
             {/* AI Employee Information Overview */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-4 rounded-2xl bg-navy-900 border border-slate-800 text-xs">
               <div>
@@ -1051,9 +1228,9 @@ export const CreateAgentWizardPage = () => {
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 text-[10px] uppercase block">Knowledge &amp; Actions</span>
-                <span className="font-bold text-emerald-400 mt-0.5 block">
-                  {agentData.knowledgeItems.length} Sources • {Object.values(agentData.actions).filter(Boolean).length} Actions
+                <span className="text-slate-400 text-[10px] uppercase block">Auto-Voice Setting</span>
+                <span className="font-bold mt-0.5 block text-emerald-400">
+                  {autoSpeakReplies ? '🔊 ON (બોલશે)' : '🔇 OFF (બંધ)'}
                 </span>
               </div>
             </div>
@@ -1067,13 +1244,21 @@ export const CreateAgentWizardPage = () => {
                     ({sandboxLanguage === 'gujarati' ? 'ગુજરાતી મોડ' : 'English Mode'})
                   </span>
                 </span>
-                <button
-                  type="button"
-                  onClick={handleClearConversation}
-                  className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition"
-                >
-                  <RotateCcw className="w-3 h-3" /> Clear
-                </button>
+                <div className="flex items-center gap-2">
+                  {isSpeakingMessageIdx !== null && (
+                    <span className="text-[11px] text-emerald-400 flex items-center gap-1 animate-pulse font-medium">
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>{sandboxLanguage === 'gujarati' ? 'અવાજ ચાલે છે...' : 'Speaking now...'}</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleClearConversation}
+                    className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1 transition"
+                  >
+                    <RotateCcw className="w-3 h-3" /> Clear
+                  </button>
+                </div>
               </div>
 
               <div className="bg-navy-900/90 rounded-2xl p-4 border border-slate-800 h-64 overflow-y-auto space-y-3">
@@ -1100,23 +1285,27 @@ export const CreateAgentWizardPage = () => {
                           : 'bg-navy-800 text-slate-100 border border-slate-700/60'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-[10px] font-semibold text-slate-400 block">
                           {msg.role === 'user' ? 'Customer:' : `${agentData.name} (AI):`}
                         </span>
                         {msg.role === 'assistant' && (
                           <button
                             type="button"
-                            onClick={() => handleSpeakSandboxMessage(msg.content, i)}
-                            className={`p-1 rounded-md text-[10px] flex items-center gap-1 transition ${
+                            onClick={() => speakSandboxMessage(msg.content, sandboxLanguage, i)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1.5 transition ${
                               isSpeakingMessageIdx === i
-                                ? 'bg-emerald-500/20 text-emerald-400 animate-pulse'
-                                : 'text-slate-400 hover:text-white hover:bg-white/10'
+                                ? 'bg-emerald-500 text-black font-bold shadow-md shadow-emerald-500/30 animate-pulse'
+                                : 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30'
                             }`}
-                            title="Listen to AI Voice"
+                            title={sandboxLanguage === 'gujarati' ? 'આખો મેસેજ સાંભળો' : 'Listen to full message aloud'}
                           >
-                            <Volume2 className="w-3.5 h-3.5" />
-                            <span>{isSpeakingMessageIdx === i ? 'Speaking...' : 'Listen'}</span>
+                            <Volume2 className={`w-3.5 h-3.5 ${isSpeakingMessageIdx === i ? 'text-black' : 'text-emerald-400'}`} />
+                            <span>
+                              {isSpeakingMessageIdx === i
+                                ? (sandboxLanguage === 'gujarati' ? '🔊 બોલે છે...' : '🔊 Speaking...')
+                                : (sandboxLanguage === 'gujarati' ? '🔊 સાંભળો' : '🔊 Listen')}
+                            </span>
                           </button>
                         )}
                       </div>
