@@ -1,8 +1,12 @@
 const jwt = require('jsonwebtoken');
+const { Resend } = require('resend'); // 1. Resend Import
 const User = require('../models/User');
 const Organization = require('../models/Organization');
 const OrganizationMember = require('../models/OrganizationMember');
 const Agent = require('../models/Agent');
+
+// Resend Client Initialization
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Helper to generate JWT token
 const generateToken = (userId) => {
@@ -11,6 +15,33 @@ const generateToken = (userId) => {
     process.env.JWT_SECRET || 'vedanco_super_secret_jwt_key_2026_prod_grade_token',
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
+};
+
+// Helper function to send welcome email safely
+const sendWelcomeEmail = async (userEmail, userName) => {
+  try {
+    // Note: Resend requires sending to your verified email during testing
+    // Change to 'khushi.vedanco@gmail.com' for testing or use userEmail once domain is verified
+    const recipient = process.env.NODE_ENV === 'production' ? userEmail : 'khushi.vedanco@gmail.com';
+
+    await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: recipient,
+      subject: 'Welcome to Vedanco AI!',
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <h2>Welcome to Vedanco AI, ${userName}!</h2>
+          <p>Thank you for signing up. Your workspace and AI Agent are ready to use.</p>
+          <p>If you have any questions, feel free to reply to this email.</p>
+          <br/>
+          <p>Best regards,<br/><strong>Vedanco Team</strong></p>
+        </div>
+      `,
+    });
+    console.log(`[Resend] Welcome email sent successfully to ${recipient}`);
+  } catch (emailErr) {
+    console.error('[Resend Error] Failed to send welcome email:', emailErr.message);
+  }
 };
 
 // @desc    Register a new user & create initial organization
@@ -108,6 +139,9 @@ exports.register = async (req, res, next) => {
       }
     } catch (socketErr) {}
 
+    // 5. Send Welcome Email via Resend
+    await sendWelcomeEmail(cleanEmail, cleanName);
+
     const token = generateToken(user._id);
 
     return res.status(201).json({
@@ -154,7 +188,6 @@ exports.login = async (req, res, next) => {
     const cleanEmail = (email || '').toLowerCase().trim();
     const user = await User.findOne({ email: cleanEmail }).select('+password');
 
-    // ONLY registered users can login
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -244,7 +277,6 @@ exports.googleLogin = async (req, res, next) => {
     let userGoogleId = googleId || null;
     let userAvatar = avatar || '';
 
-    // If a Google ID token credential was provided, verify or decode it
     if (credential) {
       try {
         const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
@@ -255,7 +287,6 @@ exports.googleLogin = async (req, res, next) => {
           userGoogleId = payload.sub || userGoogleId;
           userAvatar = payload.picture || userAvatar;
         } else {
-          // Decode payload from JWT
           const parts = credential.split('.');
           if (parts.length === 3) {
             const decodedJson = Buffer.from(parts[1], 'base64').toString('utf-8');
@@ -278,7 +309,6 @@ exports.googleLogin = async (req, res, next) => {
       });
     }
 
-    // 1. Look up existing user by googleId or email (prevent duplicate users)
     let user = await User.findOne({
       $or: [
         ...(userGoogleId ? [{ googleId: userGoogleId }] : []),
@@ -294,7 +324,6 @@ exports.googleLogin = async (req, res, next) => {
         });
       }
 
-      // Link googleId or avatar if missing
       if (userGoogleId && !user.googleId) user.googleId = userGoogleId;
       if (userAvatar && !user.avatar) user.avatar = userAvatar;
       if (req.body.role === 'admin') {
@@ -395,7 +424,6 @@ exports.googleLogin = async (req, res, next) => {
       status: 'active',
     });
 
-    // Create default Sarah receptionist for the client workspace
     await Agent.create({
       organizationId: organization._id,
       name: 'Sarah',
@@ -418,6 +446,9 @@ exports.googleLogin = async (req, res, next) => {
       }
     } catch (socketErr) {}
 
+    // Send Welcome Email to newly created Google User
+    await sendWelcomeEmail(userEmail, cleanName);
+
     const token = generateToken(user._id);
 
     return res.status(201).json({
@@ -431,7 +462,7 @@ exports.googleLogin = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role: assignedRole,
+        role,
         avatar: user.avatar,
         organizationId: user.organizationId,
       },
