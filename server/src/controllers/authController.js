@@ -17,16 +17,12 @@ const generateToken = (userId) => {
   );
 };
 
-// Helper function to send welcome email safely
+// Helper function to send welcome email safely to the registered user
 const sendWelcomeEmail = async (userEmail, userName) => {
   try {
-    // Note: Resend requires sending to your verified email during testing
-    // Change to 'khushi.vedanco@gmail.com' for testing or use userEmail once domain is verified
-    const recipient = process.env.NODE_ENV === 'production' ? userEmail : 'khushi.vedanco@gmail.com';
-
-    await resend.emails.send({
+    const data = await resend.emails.send({
       from: 'onboarding@resend.dev',
-      to: recipient,
+      to: userEmail, // Seedho register thayela user no email address
       subject: 'Welcome to Vedanco AI!',
       html: `
         <div style="font-family: sans-serif; padding: 20px; color: #333;">
@@ -38,9 +34,9 @@ const sendWelcomeEmail = async (userEmail, userName) => {
         </div>
       `,
     });
-    console.log(`[Resend] Welcome email sent successfully to ${recipient}`);
+    console.log(`[Resend] Welcome email sent successfully to ${userEmail}:`, data);
   } catch (emailErr) {
-    console.error('[Resend Error] Failed to send welcome email:', emailErr.message);
+    console.error(`[Resend Error] Failed to send welcome email to ${userEmail}:`, emailErr.message);
   }
 };
 
@@ -139,7 +135,7 @@ exports.register = async (req, res, next) => {
       }
     } catch (socketErr) {}
 
-    // 5. Send Welcome Email via Resend
+    // 5. Send Welcome Email via Resend to the new user
     await sendWelcomeEmail(cleanEmail, cleanName);
 
     const token = generateToken(user._id);
@@ -462,7 +458,7 @@ exports.googleLogin = async (req, res, next) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role,
+        role: assignedRole,
         avatar: user.avatar,
         organizationId: user.organizationId,
       },

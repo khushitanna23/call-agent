@@ -12,11 +12,11 @@ echo [2/3] Starting Backend API (Port 5000)...
 start "VEDANCO Backend" cmd /k "cd /d "%~dp0server" && node src/server.js"
 timeout /t 2 /nobreak >nul
 
-echo [3/3] Starting Frontend (Port 5173)...
-start "VEDANCO Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
+echo [3/3] Starting Frontend (Port 5174)...
+start "VEDANCO Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev -- --host 0.0.0.0 --port 5174"
 
 echo.
 echo All services launched!
-echo Open: http://localhost:5173/login
+echo Open: http://localhost:5174/login
 echo.
 pause
